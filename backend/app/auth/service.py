@@ -54,6 +54,8 @@ def authenticate(db: Session, email: str, password: str) -> User:
         valid = False
     if not valid:
         raise InvalidCredentialsError(email)
+    if user.status == "blocked":
+        raise InvalidCredentialsError(email)
     return user
 
 

@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import service
 from app.auth.deps import get_current_user
 from app.auth.models import User
-from app.auth.schemas import LoginIn, RegisterIn, TokenPair, UserOut
+from app.auth.schemas import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
 from app.core.db import get_db
 from app.core.security import InvalidTokenError, decode_token
 
@@ -29,10 +28,6 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     return service.issue_tokens(user)
 
 
-class RefreshIn(BaseModel):
-    refresh_token: str
-
-
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     return user
@@ -43,8 +38,16 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
     try:
         payload = decode_token(body.refresh_token, expected_type="refresh")
     except InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Недействительный refresh-токен")
+        raise HTTPException(
+            status_code=401,
+            detail="Недействительный refresh-токен",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user = db.get(User, int(payload["sub"]))
-    if user is None:
-        raise HTTPException(status_code=401, detail="Пользователь не найден")
+    if user is None or user.status == "blocked":
+        raise HTTPException(
+            status_code=401,
+            detail="Недействительный refresh-токен",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return service.issue_tokens(user)

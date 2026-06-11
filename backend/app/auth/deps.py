@@ -8,20 +8,22 @@ from app.core.security import InvalidTokenError, decode_token
 
 _bearer = HTTPBearer(auto_error=False)
 
+_WWW = {"WWW-Authenticate": "Bearer"}
+
 
 def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> User:
     if creds is None:
-        raise HTTPException(status_code=401, detail="Нет токена")
+        raise HTTPException(status_code=401, detail="Нет токена", headers=_WWW)
     try:
         payload = decode_token(creds.credentials, expected_type="access")
     except InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
+        raise HTTPException(status_code=401, detail="Недействительный токен", headers=_WWW)
     user = db.get(User, int(payload["sub"]))
     if user is None:
-        raise HTTPException(status_code=401, detail="Пользователь не найден")
+        raise HTTPException(status_code=401, detail="Пользователь не найден", headers=_WWW)
     return user
 
 

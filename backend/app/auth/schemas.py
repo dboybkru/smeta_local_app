@@ -12,6 +12,10 @@ class LoginIn(BaseModel):
     password: str
 
 
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
