@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.auth import service
+from app.auth import service, yandex
 from app.auth.deps import get_current_user
 from app.auth.models import User
 from app.auth.schemas import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import InvalidTokenError, decode_token
 
@@ -51,3 +55,30 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return service.issue_tokens(user)
+
+
+@router.get("/yandex/login")
+def yandex_login():
+    state = secrets.token_urlsafe(24)
+    resp = RedirectResponse(yandex.build_authorize_url(state))
+    resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax")
+    return resp
+
+
+@router.get("/yandex/callback")
+def yandex_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
+    if not state or state != request.cookies.get("yx_state"):
+        raise HTTPException(status_code=400, detail="Неверный state")
+    token = yandex.exchange_code(code)
+    info = yandex.fetch_userinfo(token)
+    user = service.get_or_create_yandex_user(db, info)
+    if user.status == "blocked":
+        raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
+    pair = service.issue_tokens(user)
+    url = (
+        f"{settings.frontend_url}/auth/callback"
+        f"#access_token={pair['access_token']}&refresh_token={pair['refresh_token']}"
+    )
+    resp = RedirectResponse(url)
+    resp.delete_cookie("yx_state")
+    return resp

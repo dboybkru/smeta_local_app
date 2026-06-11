@@ -59,6 +59,32 @@ def authenticate(db: Session, email: str, password: str) -> User:
     return user
 
 
+def get_or_create_yandex_user(db: Session, info: dict) -> User:
+    yandex_id = str(info["id"])
+    email = info.get("default_email") or f"{yandex_id}@yandex.local"
+    user = db.scalar(select(User).where(User.yandex_id == yandex_id))
+    if user:
+        return user
+    user = db.scalar(select(User).where(User.email == email))
+    if user:
+        user.yandex_id = yandex_id
+        db.commit()
+        db.refresh(user)
+        return user
+    is_first = (db.scalar(select(func.count()).select_from(User)) or 0) == 0
+    user = User(
+        email=email,
+        yandex_id=yandex_id,
+        name=info.get("real_name") or "",
+        role="admin" if is_first else "estimator",
+        status="active" if is_first else "pending",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def issue_tokens(user: User) -> dict[str, str]:
     return {
         "access_token": create_access_token(user.id, user.role),
