@@ -8,7 +8,7 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
-from app.auth import models  # noqa: F401  — registers tables in metadata  # noqa: E402
+from app.auth import models  # noqa: F401  — registers tables in metadata
 from app.core.config import settings  # noqa: E402
 from app.core.db import Base  # noqa: E402
 

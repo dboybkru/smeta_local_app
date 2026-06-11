@@ -26,7 +26,7 @@ def upgrade() -> None:
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('yandex_id', sa.String(length=64), nullable=True),
     sa.Column('password_hash', sa.String(length=255), nullable=True),
-    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('name', sa.String(length=255), server_default=sa.text("''"), nullable=False),
     sa.Column('role', sa.String(length=20), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
