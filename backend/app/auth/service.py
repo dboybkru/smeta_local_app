@@ -65,6 +65,9 @@ def get_or_create_yandex_user(db: Session, info: dict) -> User:
     user = db.scalar(select(User).where(User.yandex_id == yandex_id))
     if user:
         return user
+    # default_email подтверждён Яндексом (адрес контролируется Яндексом),
+    # поэтому линковка по email безопасна. Если Яндекс начнёт отдавать внешние
+    # адреса — пересмотреть (линковать только *@yandex.*).
     user = db.scalar(select(User).where(User.email == email))
     if user:
         user.yandex_id = yandex_id

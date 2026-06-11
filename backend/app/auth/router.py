@@ -1,5 +1,6 @@
 import secrets
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -61,16 +62,21 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
 def yandex_login():
     state = secrets.token_urlsafe(24)
     resp = RedirectResponse(yandex.build_authorize_url(state))
-    resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax")
+    resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax", secure=True)
     return resp
 
 
 @router.get("/yandex/callback")
 def yandex_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
-    if not state or state != request.cookies.get("yx_state"):
+    if state != request.cookies.get("yx_state"):
         raise HTTPException(status_code=400, detail="Неверный state")
-    token = yandex.exchange_code(code)
-    info = yandex.fetch_userinfo(token)
+    try:
+        token = yandex.exchange_code(code)
+        info = yandex.fetch_userinfo(token)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail="Ошибка авторизации через Яндекс") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail="Яндекс недоступен") from exc
     user = service.get_or_create_yandex_user(db, info)
     if user.status == "blocked":
         raise HTTPException(status_code=403, detail="Аккаунт заблокирован")

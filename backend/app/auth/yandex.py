@@ -30,6 +30,7 @@ def exchange_code(code: str) -> str:
             "client_id": settings.yandex_client_id,
             "client_secret": settings.yandex_client_secret,
         },
+        timeout=10.0,
     )
     resp.raise_for_status()
     return resp.json()["access_token"]
@@ -40,6 +41,7 @@ def fetch_userinfo(access_token: str) -> dict:
         USERINFO_URL,
         params={"format": "json"},
         headers={"Authorization": f"OAuth {access_token}"},
+        timeout=10.0,
     )
     resp.raise_for_status()
     return resp.json()

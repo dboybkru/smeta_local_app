@@ -103,3 +103,31 @@ def test_blocked_yandex_user_gets_403(client, db_session):
     db_session.commit()
 
     assert do_callback().status_code == 403
+
+
+@respx.mock
+def test_yandex_error_returns_502(client):
+    respx.post("https://oauth.yandex.ru/token").mock(return_value=Response(400))
+    login = client.get("/api/auth/yandex/login", follow_redirects=False)
+    state = login.cookies["yx_state"]
+    client.cookies.set("yx_state", state)
+    resp = client.get(
+        f"/api/auth/yandex/callback?code=expired&state={state}", follow_redirects=False
+    )
+    assert resp.status_code == 502
+
+
+@respx.mock
+def test_yandex_network_failure_returns_503(client):
+    import httpx as _httpx
+
+    respx.post("https://oauth.yandex.ru/token").mock(
+        side_effect=_httpx.ConnectError("boom")
+    )
+    login = client.get("/api/auth/yandex/login", follow_redirects=False)
+    state = login.cookies["yx_state"]
+    client.cookies.set("yx_state", state)
+    resp = client.get(
+        f"/api/auth/yandex/callback?code=abc&state={state}", follow_redirects=False
+    )
+    assert resp.status_code == 503
