@@ -48,3 +48,14 @@ def test_login_wrong_password_401(client):
 def test_login_unknown_email_401(client):
     resp = client.post("/api/auth/login", json={"email": "ghost@test.ru", "password": "x"})
     assert resp.status_code == 401
+
+
+def test_login_user_without_password_rejected(client, db_session):
+    from app.auth.models import User
+
+    db_session.add(User(email="ya-only@test.ru", yandex_id="yx-1", password_hash=None))
+    db_session.commit()
+    resp = client.post(
+        "/api/auth/login", json={"email": "ya-only@test.ru", "password": "anything"}
+    )
+    assert resp.status_code == 401

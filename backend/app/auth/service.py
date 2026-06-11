@@ -9,6 +9,10 @@ from app.core.security import (
     verify_password,
 )
 
+# Реальный argon2-хеш одноразовой строки: используется для выравнивания времени ответа
+# в пути «email не найден», чтобы нельзя было перебрать email по таймингу.
+_DUMMY_HASH = hash_password("timing-equalizer-dummy")
+
 
 class EmailTakenError(Exception):
     pass
@@ -21,6 +25,8 @@ class InvalidCredentialsError(Exception):
 def register_user(db: Session, email: str, password: str, name: str) -> User:
     if db.scalar(select(User).where(User.email == email)):
         raise EmailTakenError(email)
+    # Гонка двух первых регистраций не закрыта на уровне БД —
+    # приемлемо: оператор регистрируется первым при деплое.
     is_first = (db.scalar(select(func.count()).select_from(User)) or 0) == 0
     user = User(
         email=email,
@@ -37,12 +43,21 @@ def register_user(db: Session, email: str, password: str, name: str) -> User:
 
 def authenticate(db: Session, email: str, password: str) -> User:
     user = db.scalar(select(User).where(User.email == email))
-    if user is None or not user.password_hash or not verify_password(password, user.password_hash):
+    # Хеш проверяется всегда, чтобы по времени ответа нельзя было перебрать email.
+    # Пользователь без password_hash (Яндекс-аккаунт) никогда не проходит,
+    # даже если verify_password вернёт True против dummy-хеша.
+    if user and user.password_hash:
+        valid = verify_password(password, user.password_hash)
+    else:
+        # Прогоняем verify для выравнивания времени; результат отбрасываем.
+        verify_password(password, _DUMMY_HASH)
+        valid = False
+    if not valid:
         raise InvalidCredentialsError(email)
     return user
 
 
-def issue_tokens(user: User) -> dict:
+def issue_tokens(user: User) -> dict[str, str]:
     return {
         "access_token": create_access_token(user.id, user.role),
         "refresh_token": create_refresh_token(user.id, user.role),
