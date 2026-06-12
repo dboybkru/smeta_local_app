@@ -5,9 +5,9 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
   return (
-    <header className="flex items-center justify-between border-b border-stone-200 bg-white px-6 py-3">
-      <Link to="/" className="font-serif text-lg text-stone-900">SmetaApp</Link>
-      <nav className="flex items-center gap-4 text-sm">
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-stone-200 bg-white px-6 py-3">
+      <Link to="/" className="shrink-0 font-serif text-lg text-stone-900">SmetaApp</Link>
+      <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <Link to="/catalog" className="text-stone-600 hover:text-stone-900">Каталог</Link>
         {isAdmin && (
           <Link to="/import" className="text-stone-600 hover:text-stone-900">Импорт</Link>

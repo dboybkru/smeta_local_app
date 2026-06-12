@@ -94,7 +94,8 @@ export default function CatalogPage() {
           </select>
         </div>
 
-        <table className="w-full border-collapse text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-stone-300 text-left text-stone-500">
               <th className="py-2">Артикул</th>
@@ -121,7 +122,8 @@ export default function CatalogPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         <div className="mt-4 flex items-center gap-4 text-sm text-stone-500">
           <span>Найдено: {total}</span>
