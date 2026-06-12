@@ -7,6 +7,7 @@ export function getTokens() {
   };
 }
 
+// TODO(security): перед публичным запуском рассмотреть httpOnly-cookie вместо localStorage
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem("access_token", access);
   localStorage.setItem("refresh_token", refresh);
@@ -27,6 +28,7 @@ async function rawRequest(path: string, options: RequestInit = {}) {
   return fetch(`${BASE}${path}`, { ...options, headers });
 }
 
+// TODO(v2): общий refresh-promise, чтобы параллельные 401 не гонялись за refresh
 async function tryRefresh(): Promise<boolean> {
   const { refresh } = getTokens();
   if (!refresh) return false;
@@ -36,7 +38,8 @@ async function tryRefresh(): Promise<boolean> {
     body: JSON.stringify({ refresh_token: refresh }),
   });
   if (!resp.ok) return false;
-  const body = await resp.json();
+  const body = await resp.json().catch(() => null);
+  if (!body?.access_token || !body?.refresh_token) return false;
   setTokens(body.access_token, body.refresh_token);
   return true;
 }

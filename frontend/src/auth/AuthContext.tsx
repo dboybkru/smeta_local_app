@@ -16,7 +16,7 @@ type AuthState = {
   logout: () => void;
 };
 
-const AuthCtx = createContext<AuthState>(null!);
+const AuthCtx = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -62,5 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  return useContext(AuthCtx);
+  const ctx = useContext(AuthCtx);
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+  return ctx;
 }
