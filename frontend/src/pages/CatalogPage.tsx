@@ -57,7 +57,7 @@ export default function CatalogPage() {
     };
   }
 
-  const supplierName = (id: number) => suppliers.find((s) => s.id === id)?.name ?? id;
+  const supplierName = (id: number) => suppliers.find((s) => s.id === id)?.name ?? "—";
 
   return (
     <div className="min-h-screen bg-stone-50">
