@@ -5,17 +5,18 @@ Revises: 4b6888f72463
 Create Date: 2026-06-12 10:08:43.735415
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = '4b72ceb2e512'
-down_revision: Union[str, Sequence[str], None] = '4b6888f72463'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '4b6888f72463'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -28,12 +29,19 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
-    op.create_table('suppliers',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('column_mapping_template', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=True),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('name')
+    op.create_table(
+        'suppliers',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=255), nullable=False),
+        sa.Column(
+            'column_mapping_template',
+            sa.JSON().with_variant(
+                postgresql.JSONB(astext_type=sa.Text()), 'postgresql'
+            ),
+            nullable=True,
+        ),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('name'),
     )
     op.create_table('catalog_items',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -47,9 +55,21 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('supplier_id', 'article', 'name')
     )
-    op.create_index(op.f('ix_catalog_items_article'), 'catalog_items', ['article'], unique=False)
-    op.create_index(op.f('ix_catalog_items_name'), 'catalog_items', ['name'], unique=False)
-    op.create_index(op.f('ix_catalog_items_supplier_id'), 'catalog_items', ['supplier_id'], unique=False)
+    op.create_index(
+        op.f('ix_catalog_items_article'),
+        'catalog_items',
+        ['article'],
+        unique=False,
+    )
+    op.create_index(
+        op.f('ix_catalog_items_name'), 'catalog_items', ['name'], unique=False
+    )
+    op.create_index(
+        op.f('ix_catalog_items_supplier_id'),
+        'catalog_items',
+        ['supplier_id'],
+        unique=False,
+    )
     op.create_table('price_lists',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('supplier_id', sa.Integer(), nullable=False),
@@ -60,7 +80,12 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('supplier_id', 'version')
     )
-    op.create_index(op.f('ix_price_lists_supplier_id'), 'price_lists', ['supplier_id'], unique=False)
+    op.create_index(
+        op.f('ix_price_lists_supplier_id'),
+        'price_lists',
+        ['supplier_id'],
+        unique=False,
+    )
     op.create_table('item_prices',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('item_id', sa.Integer(), nullable=False),
@@ -73,8 +98,18 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('item_id', 'price_list_id', 'price_level_id')
     )
-    op.create_index(op.f('ix_item_prices_item_id'), 'item_prices', ['item_id'], unique=False)
-    op.create_index(op.f('ix_item_prices_price_list_id'), 'item_prices', ['price_list_id'], unique=False)
+    op.create_index(
+        op.f('ix_item_prices_item_id'),
+        'item_prices',
+        ['item_id'],
+        unique=False,
+    )
+    op.create_index(
+        op.f('ix_item_prices_price_list_id'),
+        'item_prices',
+        ['price_list_id'],
+        unique=False,
+    )
     # ### end Alembic commands ###
 
 
