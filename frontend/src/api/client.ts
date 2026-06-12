@@ -54,6 +54,17 @@ export class ApiError extends Error {
   }
 }
 
+// FastAPI отдаёт detail строкой (HTTPException) или массивом ошибок валидации (422).
+function formatDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => (d && typeof d === "object" && "msg" in d ? String(d.msg) : JSON.stringify(d)))
+      .join("; ");
+  }
+  return null;
+}
+
 export async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   let resp = await rawRequest(path, options);
   if (resp.status === 401 && (await tryRefresh())) {
@@ -61,7 +72,7 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
   }
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ detail: resp.statusText }));
-    throw new ApiError(resp.status, body.detail ?? resp.statusText);
+    throw new ApiError(resp.status, formatDetail(body.detail) ?? resp.statusText);
   }
   return resp.json();
 }
