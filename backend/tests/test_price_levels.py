@@ -45,6 +45,43 @@ def test_delete_level(client):
     assert client.get("/api/price-levels", headers=admin).json() == []
 
 
+def test_rename_to_existing_name_409(client):
+    admin = make_admin(client)
+    client.post("/api/price-levels", json={"name": "Закупка"}, headers=admin)
+    lvl = client.post("/api/price-levels", json={"name": "Опт"}, headers=admin).json()
+    resp = client.patch(
+        f"/api/price-levels/{lvl['id']}", json={"name": "Закупка"}, headers=admin
+    )
+    assert resp.status_code == 409
+
+
+def test_delete_level_in_use_409(client, db_session):
+    from decimal import Decimal
+
+    from app.catalog.models import CatalogItem, ItemPrice, PriceList, Supplier
+
+    admin = make_admin(client)
+    lvl = client.post("/api/price-levels", json={"name": "Розница"}, headers=admin).json()
+    supplier = Supplier(name="S")
+    db_session.add(supplier)
+    db_session.commit()
+    pl = PriceList(supplier_id=supplier.id, filename="f.xlsx", version=1)
+    item = CatalogItem(supplier_id=supplier.id, name="X")
+    db_session.add_all([pl, item])
+    db_session.commit()
+    db_session.add(
+        ItemPrice(
+            item_id=item.id,
+            price_list_id=pl.id,
+            price_level_id=lvl["id"],
+            value=Decimal("10"),
+        )
+    )
+    db_session.commit()
+    resp = client.delete(f"/api/price-levels/{lvl['id']}", headers=admin)
+    assert resp.status_code == 409
+
+
 def test_non_admin_cannot_write_levels(client):
     make_admin(client)
     client.post(
