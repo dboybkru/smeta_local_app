@@ -59,3 +59,17 @@ def test_login_user_without_password_rejected(client, db_session):
         "/api/auth/login", json={"email": "ya-only@test.ru", "password": "anything"}
     )
     assert resp.status_code == 401
+
+
+def test_login_email_case_insensitive(client):
+    register(client, email="user@test.ru")
+    resp = client.post(
+        "/api/auth/login", json={"email": "USER@test.ru", "password": "secret123"}
+    )
+    assert resp.status_code == 200
+
+
+def test_register_duplicate_email_case_insensitive(client):
+    register(client, email="user@test.ru")
+    resp = register(client, email="User@test.ru")
+    assert resp.status_code == 409

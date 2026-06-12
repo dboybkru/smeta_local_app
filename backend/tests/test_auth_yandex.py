@@ -118,6 +118,35 @@ def test_yandex_error_returns_502(client):
 
 
 @respx.mock
+def test_yandex_links_by_email_case_insensitive(client, db_session):
+    client.post(
+        "/api/auth/register",
+        json={"email": "ya@yandex.ru", "password": "secret123", "name": "Т"},
+    )
+    respx.post("https://oauth.yandex.ru/token").mock(
+        return_value=Response(200, json={"access_token": "ya-token"})
+    )
+    respx.get("https://login.yandex.ru/info").mock(
+        return_value=Response(
+            200, json={"id": "yx-888", "default_email": "YA@yandex.ru", "real_name": ""}
+        )
+    )
+    login = client.get("/api/auth/yandex/login", follow_redirects=False)
+    state = login.cookies["yx_state"]
+    client.cookies.set("yx_state", state)
+    resp = client.get(
+        f"/api/auth/yandex/callback?code=abc&state={state}", follow_redirects=False
+    )
+    assert resp.status_code == 307
+    # не должен создаться второй аккаунт
+    from sqlalchemy import func, select
+
+    from app.auth.models import User
+
+    assert db_session.scalar(select(func.count()).select_from(User)) == 1
+
+
+@respx.mock
 def test_yandex_network_failure_returns_503(client):
     import httpx as _httpx
 

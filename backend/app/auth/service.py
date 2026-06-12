@@ -23,6 +23,7 @@ class InvalidCredentialsError(Exception):
 
 
 def register_user(db: Session, email: str, password: str, name: str) -> User:
+    email = email.lower()
     if db.scalar(select(User).where(User.email == email)):
         raise EmailTakenError(email)
     # Гонка двух первых регистраций не закрыта на уровне БД —
@@ -42,6 +43,7 @@ def register_user(db: Session, email: str, password: str, name: str) -> User:
 
 
 def authenticate(db: Session, email: str, password: str) -> User:
+    email = email.lower()
     user = db.scalar(select(User).where(User.email == email))
     # Хеш проверяется всегда, чтобы по времени ответа нельзя было перебрать email.
     # Пользователь без password_hash (Яндекс-аккаунт) никогда не проходит,
@@ -61,7 +63,7 @@ def authenticate(db: Session, email: str, password: str) -> User:
 
 def get_or_create_yandex_user(db: Session, info: dict) -> User:
     yandex_id = str(info["id"])
-    email = info.get("default_email") or f"{yandex_id}@yandex.local"
+    email = (info.get("default_email") or f"{yandex_id}@yandex.local").lower()
     user = db.scalar(select(User).where(User.yandex_id == yandex_id))
     if user:
         return user
