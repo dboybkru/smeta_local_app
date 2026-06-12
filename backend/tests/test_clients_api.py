@@ -1,0 +1,25 @@
+from app.auth.models import User
+from app.core.security import create_access_token
+
+
+def _auth(db_session, role="estimator"):
+    u = User(email=f"{role}@x.ru", name="U", role=role, status="active")
+    db_session.add(u)
+    db_session.commit()
+    # create_access_token принимает user_id: int, role: str
+    return {"Authorization": f"Bearer {create_access_token(u.id, role)}"}
+
+
+def test_create_and_list_clients(client, db_session):
+    h = _auth(db_session)
+    r = client.post("/api/clients", json={"name": "ООО Ромашка"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["name"] == "ООО Ромашка"
+
+    r = client.get("/api/clients", headers=h)
+    assert r.status_code == 200
+    assert [c["name"] for c in r.json()] == ["ООО Ромашка"]
+
+
+def test_clients_require_auth(client):
+    assert client.get("/api/clients").status_code == 401
