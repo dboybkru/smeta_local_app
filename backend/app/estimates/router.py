@@ -24,8 +24,10 @@ def list_clients(db: Session = Depends(get_db)):
 def create_client(
     body: schemas.ClientIn,
     db: Session = Depends(get_db),
-    _: User = Depends(require_active),
+    user: User = Depends(require_active),
 ):
+    if user.role == "viewer":
+        raise HTTPException(status_code=403, detail="Просмотр без права изменения")
     client = models.Client(name=body.name, default_price_level_id=body.default_price_level_id)
     db.add(client)
     db.commit()
@@ -202,6 +204,7 @@ def add_line(
             qty=body.qty,
             work_price=body.work_price or 0,
             material_price=body.material_price or 0,
+            purchase_price_snapshot=body.purchase_price_snapshot,
             sort_order=len(section.lines),
         )
     db.add(line)

@@ -1,5 +1,6 @@
 from datetime import datetime
-from decimal import Decimal  # noqa: F401  — используется в Task 3+
+from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,7 +30,7 @@ class EstimateIn(BaseModel):
 
 class EstimatePatch(BaseModel):
     object_name: str | None = Field(default=None, max_length=500)
-    status: str | None = None
+    status: Literal["draft", "sent", "approved", "archived"] | None = None
     client_id: int | None = None
     vat_enabled: bool | None = None
     vat_rate: Decimal | None = None
@@ -86,6 +87,7 @@ class LineIn(BaseModel):
     qty: Decimal = Decimal("1")
     work_price: Decimal | None = None
     material_price: Decimal | None = None
+    purchase_price_snapshot: Decimal | None = None
 
 
 class LinePatch(BaseModel):
@@ -95,6 +97,7 @@ class LinePatch(BaseModel):
     work_price: Decimal | None = None
     material_price: Decimal | None = None
     sort_order: int | None = None
+    purchase_price_snapshot: Decimal | None = None
 
 
 class LineOut(BaseModel):

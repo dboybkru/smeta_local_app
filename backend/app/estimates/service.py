@@ -114,6 +114,8 @@ def compute_totals(est: models.Estimate) -> dict:
 
 def base_branch(est: models.Estimate) -> models.EstimateBranch:
     """Единственная базовая ветка (варианты отложены)."""
+    if not est.branches:
+        raise HTTPException(status_code=400, detail="У сметы нет ветки")
     return est.branches[0]
 
 

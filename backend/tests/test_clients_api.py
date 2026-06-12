@@ -23,3 +23,9 @@ def test_create_and_list_clients(client, db_session):
 
 def test_clients_require_auth(client):
     assert client.get("/api/clients").status_code == 401
+
+
+def test_viewer_cannot_create_client(client, db_session):
+    h = _auth(db_session, role="viewer")
+    r = client.post("/api/clients", json={"name": "ООО Тест"}, headers=h)
+    assert r.status_code == 403, r.text

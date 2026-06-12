@@ -76,6 +76,30 @@ def test_add_freeform_line(client, db_session):
     assert r.json()["work_price"] == "2000.00"
 
 
+def test_freeform_line_with_purchase_shows_margin(client, db_session):
+    """Произвольная строка с purchase_price_snapshot даёт ненулевую маржу."""
+    u = _user(db_session)
+    est_id = client.post("/api/estimates", json={"object_name": "O2"}, headers=_hdr(u)).json()["id"]
+    sec2 = client.post(
+        f"/api/estimates/{est_id}/sections", json={"name": "S2"}, headers=_hdr(u)
+    ).json()
+    r = client.post(
+        f"/api/sections/{sec2['id']}/lines",
+        json={
+            "name": "Материал без каталога",
+            "unit": "шт",
+            "qty": "1",
+            "material_price": "100",
+            "purchase_price_snapshot": "70",
+        },
+        headers=_hdr(u),
+    )
+    assert r.status_code == 201, r.text
+    detail = client.get(f"/api/estimates/{est_id}", headers=_hdr(u)).json()
+    # margin = продажа - закупка = 100 - 70 = 30
+    assert detail["totals"]["margin"] == "30.00", detail["totals"]
+
+
 def test_patch_line_qty_and_price(client, db_session):
     u = _user(db_session)
     section = _section(client, u)
