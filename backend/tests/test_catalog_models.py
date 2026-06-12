@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 
 
@@ -29,3 +32,13 @@ def test_catalog_models_roundtrip(db_session):
     assert item.unit == "шт"
     assert supplier.column_mapping_template is None
     assert price_list.imported_at is not None
+
+
+def test_invalid_kind_rejected(db_session):
+    supplier = Supplier(name="S")
+    db_session.add(supplier)
+    db_session.commit()
+    db_session.add(CatalogItem(supplier_id=supplier.id, name="X", kind="service"))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
