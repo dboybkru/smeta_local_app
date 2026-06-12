@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -54,6 +54,62 @@ def get_owned_line(db: Session, line_id: int, user: User) -> models.EstimateLine
     if user.role == "estimator" and est.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Строка не найдена")
     return line
+
+
+_CENTS = Decimal("0.01")
+
+
+def _q(value: Decimal) -> Decimal:
+    return value.quantize(_CENTS, rounding=ROUND_HALF_UP)
+
+
+def compute_totals(est: models.Estimate) -> dict:
+    """Все разделы всех веток сметы. Деньги — квантованный Decimal."""
+    sections_out = []
+    subtotal = Decimal("0")
+    sub_materials = Decimal("0")
+    sub_works = Decimal("0")
+    est_purchase = Decimal("0")
+
+    for branch in est.branches:
+        for section in branch.sections:
+            materials = sum((ln.material_price * ln.qty for ln in section.lines), Decimal("0"))
+            works = sum((ln.work_price * ln.qty for ln in section.lines), Decimal("0"))
+            purchase = sum(
+                (ln.purchase_price_snapshot * ln.qty
+                 for ln in section.lines if ln.purchase_price_snapshot is not None),
+                Decimal("0"),
+            )
+            factor = Decimal("1") + section.markup_percent / Decimal("100")
+            materials_sell = materials * factor
+            works_sell = works * factor
+            sect_total = materials_sell + works_sell
+            sect_margin = sect_total - purchase
+
+            sections_out.append({
+                "section_id": section.id,
+                "materials": _q(materials_sell),
+                "works": _q(works_sell),
+                "total": _q(sect_total),
+                "purchase": _q(purchase),
+                "margin": _q(sect_margin),
+            })
+            subtotal += sect_total
+            sub_materials += materials_sell
+            sub_works += works_sell
+            est_purchase += purchase
+
+    vat = subtotal * est.vat_rate / Decimal("100") if est.vat_enabled else Decimal("0")
+    return {
+        "sections": sections_out,
+        "materials": _q(sub_materials),
+        "works": _q(sub_works),
+        "subtotal": _q(subtotal),
+        "vat": _q(vat),
+        "total": _q(subtotal + vat),
+        "purchase": _q(est_purchase),
+        "margin": _q(subtotal - est_purchase),
+    }
 
 
 def base_branch(est: models.Estimate) -> models.EstimateBranch:
