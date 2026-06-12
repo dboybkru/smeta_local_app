@@ -59,3 +59,13 @@ def test_repeated_header_rows_skipped():
     mapping = ColumnMapping(name_col=0, price_cols={1: 1})
     parsed = parse_rows(rows, header_row=0, mapping=mapping)
     assert [p.name for p in parsed] == ["Товар А", "Товар Б"]
+
+
+def test_negative_price_is_problem():
+    from app.catalog.schemas import ColumnMapping
+
+    rows = [["Имя", "Цена"], ["Товар", -100]]
+    mapping = ColumnMapping(name_col=0, price_cols={1: 1})
+    parsed = parse_rows(rows, header_row=0, mapping=mapping)
+    assert parsed[0].prices == {}
+    assert any("трицатель" in p or "< 0" in p for p in parsed[0].problems)
