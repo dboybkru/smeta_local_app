@@ -64,3 +64,15 @@ def test_admin_cannot_block_self(client):
         f"/api/admin/users/{me['id']}/status", json={"status": "blocked"}, headers=auth(admin)
     )
     assert resp.status_code == 400
+
+
+def test_admin_blocks_other_user(client):
+    admin = make_user(client, "admin@test.ru")
+    make_user(client, "second@test.ru")
+    users = client.get("/api/admin/users", headers=auth(admin)).json()
+    other_id = next(u["id"] for u in users if u["email"] == "second@test.ru")
+    resp = client.post(
+        f"/api/admin/users/{other_id}/status", json={"status": "blocked"}, headers=auth(admin)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "blocked"
