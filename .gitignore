@@ -7,3 +7,6 @@ node_modules/
 dist/
 .pytest_cache/
 .ruff_cache/
+
+# graphify output (knowledge graph lives in D:/git/graphify-out, never commit)
+graphify-out/
