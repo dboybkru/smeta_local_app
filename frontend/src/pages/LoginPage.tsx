@@ -16,7 +16,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await loginWithPassword(email, password);
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка входа");
     } finally {
@@ -62,7 +62,7 @@ export default function LoginPage() {
               className="mt-1 w-full rounded border border-stone-300 px-3 py-2"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={busy}
