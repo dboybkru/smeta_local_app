@@ -2,7 +2,6 @@ from decimal import Decimal
 
 from app.auth.models import User
 from app.estimates.models import (
-    Client,
     Estimate,
     EstimateBranch,
     EstimateLine,
@@ -33,7 +32,7 @@ def test_cascade_delete_estimate_removes_children(db_session):
     est = Estimate(owner_id=owner.id, object_name="O")
     branch = EstimateBranch(estimate=est, name="Базовая")
     section = EstimateSection(branch=branch, name="Раздел 1")
-    line = EstimateLine(section=section, name="Позиция", unit="шт", qty=Decimal("2"))
+    EstimateLine(section=section, name="Позиция", unit="шт", qty=Decimal("2"))
     db_session.add(est)
     db_session.commit()
     assert db_session.query(EstimateLine).count() == 1

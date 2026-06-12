@@ -39,10 +39,19 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('client_id', sa.Integer(), nullable=True),
         sa.Column('owner_id', sa.Integer(), nullable=False),
-        sa.Column('object_name', sa.String(length=500), server_default=sa.text("''"), nullable=False),
-        sa.Column('status', sa.String(length=20), server_default=sa.text("'draft'"), nullable=False),
+        sa.Column(
+            'object_name', sa.String(length=500), server_default=sa.text("''"), nullable=False
+        ),
+        sa.Column(
+            'status', sa.String(length=20), server_default=sa.text("'draft'"), nullable=False
+        ),
         sa.Column('vat_enabled', sa.Boolean(), server_default=sa.text('0'), nullable=False),
-        sa.Column('vat_rate', sa.Numeric(precision=5, scale=2), server_default=sa.text("'20'"), nullable=False),
+        sa.Column(
+            'vat_rate',
+            sa.Numeric(precision=5, scale=2),
+            server_default=sa.text("'20'"),
+            nullable=False,
+        ),
         sa.Column(
             'created_at',
             sa.DateTime(timezone=True),
@@ -58,7 +67,9 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('estimate_id', sa.Integer(), nullable=False),
         sa.Column('parent_branch_id', sa.Integer(), nullable=True),
-        sa.Column('name', sa.String(length=255), server_default=sa.text("'Базовая'"), nullable=False),
+        sa.Column(
+            'name', sa.String(length=255), server_default=sa.text("'Базовая'"), nullable=False
+        ),
         sa.ForeignKeyConstraint(['estimate_id'], ['estimates.id']),
         sa.ForeignKeyConstraint(['parent_branch_id'], ['estimate_branches.id']),
         sa.PrimaryKeyConstraint('id'),
@@ -69,7 +80,12 @@ def upgrade() -> None:
         sa.Column('branch_id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=255), server_default=sa.text("''"), nullable=False),
         sa.Column('sort_order', sa.Integer(), server_default=sa.text('0'), nullable=False),
-        sa.Column('markup_percent', sa.Numeric(precision=5, scale=2), server_default=sa.text("'0'"), nullable=False),
+        sa.Column(
+            'markup_percent',
+            sa.Numeric(precision=5, scale=2),
+            server_default=sa.text("'0'"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(['branch_id'], ['estimate_branches.id']),
         sa.PrimaryKeyConstraint('id'),
     )
@@ -80,9 +96,21 @@ def upgrade() -> None:
         sa.Column('item_id', sa.Integer(), nullable=True),
         sa.Column('name', sa.String(length=500), server_default=sa.text("''"), nullable=False),
         sa.Column('unit', sa.String(length=50), server_default=sa.text("'шт'"), nullable=False),
-        sa.Column('qty', sa.Numeric(precision=12, scale=3), server_default=sa.text("'1'"), nullable=False),
-        sa.Column('work_price', sa.Numeric(precision=12, scale=2), server_default=sa.text("'0'"), nullable=False),
-        sa.Column('material_price', sa.Numeric(precision=12, scale=2), server_default=sa.text("'0'"), nullable=False),
+        sa.Column(
+            'qty', sa.Numeric(precision=12, scale=3), server_default=sa.text("'1'"), nullable=False
+        ),
+        sa.Column(
+            'work_price',
+            sa.Numeric(precision=12, scale=2),
+            server_default=sa.text("'0'"),
+            nullable=False,
+        ),
+        sa.Column(
+            'material_price',
+            sa.Numeric(precision=12, scale=2),
+            server_default=sa.text("'0'"),
+            nullable=False,
+        ),
         sa.Column('purchase_price_snapshot', sa.Numeric(precision=12, scale=2), nullable=True),
         sa.Column('sort_order', sa.Integer(), server_default=sa.text('0'), nullable=False),
         sa.ForeignKeyConstraint(['item_id'], ['catalog_items.id']),

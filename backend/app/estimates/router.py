@@ -10,7 +10,11 @@ from app.estimates import models, schemas
 router = APIRouter(prefix="/api", tags=["estimates"])
 
 
-@router.get("/clients", response_model=list[schemas.ClientOut], dependencies=[Depends(require_active)])
+@router.get(
+    "/clients",
+    response_model=list[schemas.ClientOut],
+    dependencies=[Depends(require_active)],
+)
 def list_clients(db: Session = Depends(get_db)):
     return db.scalars(select(models.Client).order_by(models.Client.name)).all()
 
