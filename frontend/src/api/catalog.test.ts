@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { inspectFile, importFile, listItems, listPriceLevels } from "./catalog";
+import { inspectFile, importFile, listItems, listPriceLevels, deletePriceLevel } from "./catalog";
 
 function mockFetchOnce(data: unknown, status = 200) {
   return vi.fn(async () =>
@@ -66,5 +66,13 @@ describe("catalog api", () => {
     expect(JSON.parse(form.get("sheets") as string)).toEqual(["Лист1"]);
     expect(JSON.parse(form.get("mapping") as string).price_cols).toEqual({ "1": 4 });
     expect(form.get("save_mapping")).toBe("true");
+  });
+
+  it("deletePriceLevel resolves on a 204 empty response", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(deletePriceLevel(7)).resolves.toBeUndefined();
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(calls[0][0]).toBe("/api/price-levels/7");
   });
 });

@@ -75,6 +75,9 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
     const body = await resp.json().catch(() => ({ detail: resp.statusText }));
     throw new ApiError(resp.status, formatDetail(body.detail) ?? resp.statusText);
   }
+  if (resp.status === 204 || resp.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return resp.json();
 }
 

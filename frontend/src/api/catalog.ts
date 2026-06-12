@@ -108,6 +108,8 @@ export const listItems = (f: ItemFilters = {}) => {
 };
 
 export const listPriceLists = (supplier_id?: number) => {
-  const q = supplier_id != null ? `?supplier_id=${supplier_id}` : "";
-  return api<PriceList[]>(`/catalog/price-lists${q}`);
+  const params = new URLSearchParams();
+  if (supplier_id != null) params.set("supplier_id", String(supplier_id));
+  const qs = params.toString();
+  return api<PriceList[]>(`/catalog/price-lists${qs ? `?${qs}` : ""}`);
 };
