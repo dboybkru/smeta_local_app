@@ -5,16 +5,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_active, require_admin
-from app.catalog import importer, parser
-from app.catalog.models import ItemPrice, PriceLevel, Supplier
+from app.catalog import importer, parser, service
+from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.catalog.schemas import (
     ColumnMapping,
     ColumnOut,
     ImportSummaryOut,
     InspectOut,
+    ItemOut,
+    ItemsPageOut,
+    PriceHistoryOut,
     PriceLevelIn,
     PriceLevelOut,
     PriceLevelPatch,
+    PriceListOut,
     SheetOut,
     SupplierIn,
     SupplierOut,
@@ -187,3 +191,80 @@ async def import_file(
         supplier.column_mapping_template = col_mapping.model_dump()
         db.commit()
     return ImportSummaryOut(**summary.__dict__)
+
+
+@router.get(
+    "/catalog/items", response_model=ItemsPageOut, dependencies=[Depends(require_active)]
+)
+def list_items(
+    q: str = "",
+    supplier_id: int | None = None,
+    kind: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    items, total = service.search_items(db, q, supplier_id, kind, min(limit, 200), offset)
+    prices = service.latest_prices_for(db, [i.id for i in items])
+    out = [
+        ItemOut(
+            id=i.id,
+            supplier_id=i.supplier_id,
+            name=i.name,
+            article=i.article,
+            unit=i.unit,
+            category=i.category,
+            kind=i.kind,
+            prices=prices.get(i.id, {}),
+        )
+        for i in items
+    ]
+    return ItemsPageOut(items=out, total=total)
+
+
+@router.get(
+    "/catalog/items/{item_id}/prices",
+    response_model=list[PriceHistoryOut],
+    dependencies=[Depends(require_active)],
+)
+def item_price_history(item_id: int, db: Session = Depends(get_db)):
+    if db.get(CatalogItem, item_id) is None:
+        raise HTTPException(status_code=404, detail="Позиция не найдена")
+    rows = db.execute(
+        select(ItemPrice, PriceList)
+        .join(PriceList, PriceList.id == ItemPrice.price_list_id)
+        .where(ItemPrice.item_id == item_id)
+        .order_by(PriceList.version.desc())
+    ).all()
+    return [
+        PriceHistoryOut(
+            price_list_id=price.price_list_id,
+            version=price_list.version,
+            imported_at=price_list.imported_at.isoformat(),
+            price_level_id=price.price_level_id,
+            value=price.value,
+        )
+        for price, price_list in rows
+    ]
+
+
+@router.get(
+    "/catalog/price-lists",
+    response_model=list[PriceListOut],
+    dependencies=[Depends(require_active)],
+)
+def list_price_lists(supplier_id: int | None = None, db: Session = Depends(get_db)):
+    query = select(PriceList).order_by(PriceList.imported_at.desc())
+    if supplier_id is not None:
+        query = query.where(PriceList.supplier_id == supplier_id)
+    rows = db.scalars(query).all()
+    return [
+        PriceListOut(
+            id=pl.id,
+            supplier_id=pl.supplier_id,
+            filename=pl.filename,
+            version=pl.version,
+            imported_at=pl.imported_at.isoformat() if pl.imported_at else None,
+        )
+        for pl in rows
+    ]

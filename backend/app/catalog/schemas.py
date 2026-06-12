@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -66,3 +68,37 @@ class ImportSummaryOut(BaseModel):
     prices_written: int
     price_changes: int
     rows_skipped: int
+
+
+class ItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    supplier_id: int
+    name: str
+    article: str
+    unit: str
+    category: str
+    kind: str
+    prices: dict[int, Decimal] = {}
+
+
+class ItemsPageOut(BaseModel):
+    items: list[ItemOut]
+    total: int
+
+
+class PriceHistoryOut(BaseModel):
+    price_list_id: int
+    version: int
+    imported_at: str
+    price_level_id: int
+    value: Decimal
+
+
+class PriceListOut(BaseModel):
+    id: int
+    supplier_id: int
+    filename: str
+    version: int
+    imported_at: str | None = None
