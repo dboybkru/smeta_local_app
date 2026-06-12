@@ -38,6 +38,8 @@ def _load_tables_or_415(content: bytes, filename: str) -> dict:
         return parser.load_tables(content, filename)
     except parser.UnsupportedFileError:
         raise HTTPException(status_code=415, detail="Поддерживаются только .xlsx и .csv")
+    except parser.CorruptFileError:
+        raise HTTPException(status_code=422, detail="Файл повреждён или не является xlsx")
 
 
 @router.get(

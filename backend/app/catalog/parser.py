@@ -2,6 +2,7 @@
 
 import csv
 import io
+import zipfile
 from dataclasses import dataclass
 
 from openpyxl import load_workbook
@@ -54,6 +55,10 @@ class UnsupportedFileError(Exception):
     pass
 
 
+class CorruptFileError(Exception):
+    pass
+
+
 def load_tables(content: bytes, filename: str) -> dict[str, Rows]:
     """Файл -> {имя листа: строки}. Для csv единственный 'лист' с именем 'csv'."""
     lower = filename.lower()
@@ -65,7 +70,10 @@ def load_tables(content: bytes, filename: str) -> dict[str, Rows]:
 
 
 def _load_xlsx(content: bytes) -> dict[str, Rows]:
-    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    try:
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except (zipfile.BadZipFile, KeyError, ValueError) as exc:
+        raise CorruptFileError(str(exc)) from exc
     tables: dict[str, Rows] = {}
     for ws in wb.worksheets:
         rows = [list(row) for row in ws.iter_rows(values_only=True)]

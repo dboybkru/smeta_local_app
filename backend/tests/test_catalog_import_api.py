@@ -112,3 +112,13 @@ def test_oversized_upload_413(client):
         "/api/catalog/inspect", files={"file": ("big.xlsx", big)}, headers=admin
     )
     assert resp.status_code == 413
+
+
+def test_corrupt_xlsx_422(client):
+    admin = make_admin(client)
+    resp = client.post(
+        "/api/catalog/inspect",
+        files={"file": ("fake.xlsx", b"this is not a zip")},
+        headers=admin,
+    )
+    assert resp.status_code == 422
