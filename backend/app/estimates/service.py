@@ -1,8 +1,12 @@
+from decimal import Decimal
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.catalog.models import CatalogItem, PriceLevel
+from app.catalog.service import latest_prices_for
 from app.estimates import models
 
 
@@ -45,3 +49,35 @@ def get_owned_section(db: Session, section_id: int, user: User) -> models.Estima
 def base_branch(est: models.Estimate) -> models.EstimateBranch:
     """Единственная базовая ветка (варианты отложены)."""
     return est.branches[0]
+
+
+ZAKUPKA_LEVEL_NAME = "Закупка"
+
+
+def snapshot_line_values(
+    db: Session,
+    item: CatalogItem,
+    client: models.Client | None,
+) -> tuple[Decimal, Decimal, Decimal | None]:
+    """Возвращает (work_price, material_price, purchase_price_snapshot).
+
+    Цены фиксируются на момент добавления позиции.
+    """
+    prices = latest_prices_for(db, [item.id]).get(item.id, {})
+
+    sell_level_id = client.default_price_level_id if client else None
+    if sell_level_id is None:
+        first = db.scalars(
+            select(PriceLevel).order_by(PriceLevel.sort_order, PriceLevel.id)
+        ).first()
+        sell_level_id = first.id if first else None
+    sell = prices.get(sell_level_id, Decimal("0")) if sell_level_id is not None else Decimal("0")
+
+    zakupka = db.scalars(
+        select(PriceLevel).where(PriceLevel.name == ZAKUPKA_LEVEL_NAME)
+    ).first()
+    purchase = prices.get(zakupka.id) if zakupka is not None else None
+
+    if item.kind == "work":
+        return sell, Decimal("0"), purchase
+    return Decimal("0"), sell, purchase
