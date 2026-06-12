@@ -20,10 +20,11 @@ export function clearTokens() {
 
 async function rawRequest(path: string, options: RequestInit = {}) {
   const { access } = getTokens();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
+  // Browser must set the multipart boundary itself — never force Content-Type for FormData.
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
   if (access) headers["Authorization"] = `Bearer ${access}`;
   return fetch(`${BASE}${path}`, { ...options, headers });
 }
@@ -75,4 +76,8 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
     throw new ApiError(resp.status, formatDetail(body.detail) ?? resp.statusText);
   }
   return resp.json();
+}
+
+export async function apiUpload<T = unknown>(path: string, form: FormData): Promise<T> {
+  return api<T>(path, { method: "POST", body: form });
 }
