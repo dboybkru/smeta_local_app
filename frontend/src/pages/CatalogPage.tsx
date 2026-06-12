@@ -97,7 +97,8 @@ export default function CatalogPage() {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-stone-300 text-left text-stone-500">
-              <th className="py-2">Наименование</th>
+              <th className="py-2">Артикул</th>
+              <th>Наименование</th>
               <th>Поставщик</th>
               <th>Ед.</th>
               {levels.map((l) => (
@@ -108,7 +109,8 @@ export default function CatalogPage() {
           <tbody>
             {items.map((it) => (
               <tr key={it.id} className="border-b border-stone-200">
-                <td className="py-2 text-stone-900">{it.name}</td>
+                <td className="py-2 text-stone-500">{it.article || "—"}</td>
+                <td className="text-stone-900">{it.name}</td>
                 <td className="text-stone-500">{supplierName(it.supplier_id)}</td>
                 <td className="text-stone-500">{it.unit}</td>
                 {levels.map((l) => (

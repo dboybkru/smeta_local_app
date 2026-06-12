@@ -22,7 +22,7 @@ const LEVELS = [{ id: 1, name: "Розница", sort_order: 0 }];
 const SUPPLIERS = [{ id: 1, name: "Болид", column_mapping_template: null }];
 const PAGE = {
   items: [
-    { id: 7, supplier_id: 1, name: "С2000-4", article: "С2000-4", unit: "шт",
+    { id: 7, supplier_id: 1, name: "Прибор приёмно-контрольный", article: "С2000-4", unit: "шт",
       category: "Орион", kind: "material", prices: { "1": "1234.50" } },
   ],
   total: 1,
@@ -42,7 +42,8 @@ describe("CatalogPage", () => {
       "/api/catalog/items": PAGE,
     }));
     renderPage();
-    expect(await screen.findByText("С2000-4")).toBeInTheDocument();
+    expect(await screen.findByText("Прибор приёмно-контрольный")).toBeInTheDocument(); // name
+    expect(screen.getByText("С2000-4")).toBeInTheDocument(); // article column
     expect(screen.getByText("Розница")).toBeInTheDocument(); // price column header
     expect(screen.getByText("1234.50")).toBeInTheDocument();
   });
@@ -55,7 +56,7 @@ describe("CatalogPage", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     renderPage();
-    await screen.findByText("С2000-4");
+    await screen.findByText("Прибор приёмно-контрольный");
     await userEvent.type(screen.getByPlaceholderText("Поиск по названию или артикулу"), "с2000");
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map((c) => c[0] as string);
