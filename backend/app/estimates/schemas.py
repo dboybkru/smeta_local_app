@@ -110,3 +110,71 @@ class LineOut(BaseModel):
     material_price: Decimal
     sort_order: int
     # purchase_price_snapshot НЕ здесь — добавится в Task 8 через роле-зависимую сериализацию
+
+
+# --- detail tree + totals ---
+class LineDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    section_id: int
+    item_id: int | None
+    name: str
+    unit: str
+    qty: Decimal
+    work_price: Decimal
+    material_price: Decimal
+    sort_order: int
+    purchase_price_snapshot: Decimal | None = None  # обнуляется для не-владельцев
+
+
+class SectionDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    sort_order: int
+    markup_percent: Decimal
+    lines: list[LineDetail]
+
+
+class BranchDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    sections: list[SectionDetail]
+
+
+class SectionTotals(BaseModel):
+    section_id: int
+    materials: Decimal
+    works: Decimal
+    total: Decimal
+    purchase: Decimal | None = None
+    margin: Decimal | None = None
+
+
+class EstimateTotals(BaseModel):
+    sections: list[SectionTotals]
+    materials: Decimal
+    works: Decimal
+    subtotal: Decimal
+    vat: Decimal
+    total: Decimal
+    purchase: Decimal | None = None
+    margin: Decimal | None = None
+
+
+class EstimateDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    client_id: int | None
+    owner_id: int
+    object_name: str
+    status: str
+    vat_enabled: bool
+    vat_rate: Decimal
+    branches: list[BranchDetail]
+    totals: EstimateTotals | None = None
