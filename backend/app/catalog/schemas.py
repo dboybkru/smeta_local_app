@@ -68,6 +68,7 @@ class ImportSummaryOut(BaseModel):
     prices_written: int
     price_changes: int
     rows_skipped: int
+    problems: list[str] = []
 
 
 class ItemOut(BaseModel):

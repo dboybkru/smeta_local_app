@@ -86,3 +86,15 @@ def test_rows_with_problems_are_skipped(db_session):
     summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material")
     assert summary.items_created == 1
     assert summary.rows_skipped == 1
+
+
+def test_duplicate_rows_in_one_file_skipped(db_session):
+    supplier, level = setup_base(db_session)
+    parsed = [
+        ParsedRow(name="Сириус", article="A1", prices={level.id: Decimal("100.00")}),
+        ParsedRow(name="Сириус дубль", article="A1", prices={level.id: Decimal("200.00")}),
+    ]
+    summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material")
+    assert summary.items_created == 1
+    assert summary.rows_skipped == 1
+    assert summary.prices_written == 1

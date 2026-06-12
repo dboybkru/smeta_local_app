@@ -30,6 +30,7 @@ class ImportSummary:
     prices_written: int = 0
     price_changes: int = 0
     rows_skipped: int = 0
+    problems: list[str] = field(default_factory=list)
 
 
 def _cell(row: list, index: int | None) -> str:
@@ -130,10 +131,19 @@ def import_parsed(
     db.flush()
 
     summary = ImportSummary(price_list_id=price_list.id, version=version)
+    seen_keys: set[tuple[str, str]] = set()
     for row in parsed:
         if row.problems:
             summary.rows_skipped += 1
+            summary.problems.append(f"{row.name}: {'; '.join(row.problems)}")
             continue
+        key = ("a", row.article) if row.article else ("n", row.name)
+        if key in seen_keys:
+            row.problems.append("Дубликат строки в файле — пропущена")
+            summary.rows_skipped += 1
+            summary.problems.append(f"{row.name}: {'; '.join(row.problems)}")
+            continue
+        seen_keys.add(key)
         item = _find_item(db, supplier_id, row)
         if item is None:
             item = CatalogItem(

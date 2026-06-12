@@ -4,6 +4,32 @@ from tests.catalog_files import make_bolid_xlsx, make_optimus_xlsx
 from tests.test_price_levels import make_admin
 
 
+def test_import_returns_problems(client):
+    admin = make_admin(client)
+    retail = create_level(client, admin, "Розница")
+    supplier_id = create_supplier(client, admin, "P")
+    csv_content = "Название;Цена\nТовар;договорная\nНорм;100\n".encode()
+    mapping = {"name_col": 0, "price_cols": {retail: 1}}
+    resp = client.post(
+        "/api/catalog/import",
+        files={"file": ("p.csv", csv_content)},
+        data={
+            "supplier_id": str(supplier_id),
+            "kind": "material",
+            "sheets": json.dumps(["csv"]),
+            "mapping": json.dumps(mapping),
+            "use_sheet_as_category": "false",
+            "save_mapping": "false",
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["rows_skipped"] == 1
+    assert len(body["problems"]) == 1
+    assert "Товар" in body["problems"][0]
+
+
 def create_level(client, admin, name):
     return client.post("/api/price-levels", json={"name": name}, headers=admin).json()["id"]
 
