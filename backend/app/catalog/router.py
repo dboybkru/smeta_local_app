@@ -3,8 +3,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_active, require_admin
-from app.catalog.models import ItemPrice, PriceLevel
-from app.catalog.schemas import PriceLevelIn, PriceLevelOut, PriceLevelPatch
+from app.catalog.models import ItemPrice, PriceLevel, Supplier
+from app.catalog.schemas import (
+    PriceLevelIn,
+    PriceLevelOut,
+    PriceLevelPatch,
+    SupplierIn,
+    SupplierOut,
+)
 from app.core.db import get_db
 
 router = APIRouter(prefix="/api", tags=["catalog"])
@@ -51,6 +57,26 @@ def update_price_level(level_id: int, body: PriceLevelPatch, db: Session = Depen
     db.commit()
     db.refresh(level)
     return level
+
+
+@router.get(
+    "/suppliers", response_model=list[SupplierOut], dependencies=[Depends(require_active)]
+)
+def list_suppliers(db: Session = Depends(get_db)):
+    return db.scalars(select(Supplier).order_by(Supplier.name)).all()
+
+
+@router.post(
+    "/suppliers", response_model=SupplierOut, status_code=201, dependencies=[Depends(require_admin)]
+)
+def create_supplier(body: SupplierIn, db: Session = Depends(get_db)):
+    if db.scalar(select(Supplier).where(Supplier.name == body.name)):
+        raise HTTPException(status_code=409, detail="Поставщик уже существует")
+    supplier = Supplier(name=body.name)
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
 
 
 @router.delete(
