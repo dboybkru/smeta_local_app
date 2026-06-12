@@ -54,3 +54,25 @@ class EstimateOut(BaseModel):
     vat_enabled: bool
     vat_rate: Decimal
     branches: list[BranchOut]
+
+
+# --- sections ---
+class SectionIn(BaseModel):
+    name: str = Field(default="", max_length=255)
+    markup_percent: Decimal = Decimal("0")
+
+
+class SectionPatch(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    sort_order: int | None = None
+    markup_percent: Decimal | None = None
+
+
+class SectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    branch_id: int
+    name: str
+    sort_order: int
+    markup_percent: Decimal

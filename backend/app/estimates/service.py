@@ -30,3 +30,18 @@ def require_write(est: models.Estimate, user: User) -> None:
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
     if user.role == "estimator" and est.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Смета не найдена")
+
+
+def get_owned_section(db: Session, section_id: int, user: User) -> models.EstimateSection:
+    section = db.get(models.EstimateSection, section_id)
+    if section is None:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
+    est = section.branch.estimate
+    if user.role == "estimator" and est.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
+    return section
+
+
+def base_branch(est: models.Estimate) -> models.EstimateBranch:
+    """Единственная базовая ветка (варианты отложены)."""
+    return est.branches[0]

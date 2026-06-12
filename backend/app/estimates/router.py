@@ -94,3 +94,57 @@ def delete_estimate(
     service.require_write(est, user)
     db.delete(est)
     db.commit()
+
+
+@router.post(
+    "/estimates/{estimate_id}/sections",
+    response_model=schemas.SectionOut,
+    status_code=201,
+)
+def add_section(
+    estimate_id: int,
+    body: schemas.SectionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    est = service.get_owned_estimate(db, estimate_id, user)
+    service.require_write(est, user)
+    branch = service.base_branch(est)
+    section = models.EstimateSection(
+        branch_id=branch.id,
+        name=body.name,
+        markup_percent=body.markup_percent,
+        sort_order=len(branch.sections),
+    )
+    db.add(section)
+    db.commit()
+    db.refresh(section)
+    return section
+
+
+@router.patch("/sections/{section_id}", response_model=schemas.SectionOut)
+def patch_section(
+    section_id: int,
+    body: schemas.SectionPatch,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    section = service.get_owned_section(db, section_id, user)
+    service.require_write(section.branch.estimate, user)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(section, field, value)
+    db.commit()
+    db.refresh(section)
+    return section
+
+
+@router.delete("/sections/{section_id}", status_code=204)
+def delete_section(
+    section_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    section = service.get_owned_section(db, section_id, user)
+    service.require_write(section.branch.estimate, user)
+    db.delete(section)
+    db.commit()
