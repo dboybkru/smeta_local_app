@@ -39,3 +39,30 @@ class SupplierOut(BaseModel):
     id: int
     name: str
     column_mapping_template: dict | None
+
+
+class ColumnOut(BaseModel):
+    index: int
+    header: str
+    samples: list[str]
+
+
+class SheetOut(BaseModel):
+    name: str
+    row_count: int
+    header_row: int
+    columns: list[ColumnOut]
+
+
+class InspectOut(BaseModel):
+    sheets: list[SheetOut]
+
+
+class ImportSummaryOut(BaseModel):
+    price_list_id: int
+    version: int
+    items_created: int
+    items_updated: int
+    prices_written: int
+    price_changes: int
+    rows_skipped: int
