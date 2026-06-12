@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import require_active
 from app.auth.models import User
+from app.catalog.models import CatalogItem
 from app.core.db import get_db
 from app.estimates import models, schemas, service
 
@@ -147,4 +148,75 @@ def delete_section(
     section = service.get_owned_section(db, section_id, user)
     service.require_write(section.branch.estimate, user)
     db.delete(section)
+    db.commit()
+
+
+@router.post("/sections/{section_id}/lines", response_model=schemas.LineOut, status_code=201)
+def add_line(
+    section_id: int,
+    body: schemas.LineIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    section = service.get_owned_section(db, section_id, user)
+    service.require_write(section.branch.estimate, user)
+    if body.item_id is not None:
+        item = db.get(CatalogItem, body.item_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Позиция каталога не найдена")
+        est = section.branch.estimate
+        client = db.get(models.Client, est.client_id) if est.client_id else None
+        work, material, purchase = service.snapshot_line_values(db, item, client)
+        line = models.EstimateLine(
+            section_id=section.id,
+            item_id=item.id,
+            name=item.name,
+            unit=item.unit,
+            qty=body.qty,
+            work_price=work,
+            material_price=material,
+            purchase_price_snapshot=purchase,
+            sort_order=len(section.lines),
+        )
+    else:
+        line = models.EstimateLine(
+            section_id=section.id,
+            name=body.name or "",
+            unit=body.unit or "шт",
+            qty=body.qty,
+            work_price=body.work_price or 0,
+            material_price=body.material_price or 0,
+            sort_order=len(section.lines),
+        )
+    db.add(line)
+    db.commit()
+    db.refresh(line)
+    return line
+
+
+@router.patch("/lines/{line_id}", response_model=schemas.LineOut)
+def patch_line(
+    line_id: int,
+    body: schemas.LinePatch,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    line = service.get_owned_line(db, line_id, user)
+    service.require_write(line.section.branch.estimate, user)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(line, field, value)
+    db.commit()
+    db.refresh(line)
+    return line
+
+
+@router.delete("/lines/{line_id}", status_code=204)
+def delete_line(
+    line_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+):
+    line = service.get_owned_line(db, line_id, user)
+    service.require_write(line.section.branch.estimate, user)
+    db.delete(line)
     db.commit()

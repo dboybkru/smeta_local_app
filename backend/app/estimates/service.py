@@ -46,6 +46,16 @@ def get_owned_section(db: Session, section_id: int, user: User) -> models.Estima
     return section
 
 
+def get_owned_line(db: Session, line_id: int, user: User) -> models.EstimateLine:
+    line = db.get(models.EstimateLine, line_id)
+    if line is None:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
+    est = line.section.branch.estimate
+    if user.role == "estimator" and est.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
+    return line
+
+
 def base_branch(est: models.Estimate) -> models.EstimateBranch:
     """Единственная базовая ветка (варианты отложены)."""
     return est.branches[0]

@@ -76,3 +76,37 @@ class SectionOut(BaseModel):
     name: str
     sort_order: int
     markup_percent: Decimal
+
+
+# --- lines ---
+class LineIn(BaseModel):
+    item_id: int | None = None
+    name: str | None = Field(default=None, max_length=500)
+    unit: str | None = Field(default=None, max_length=50)
+    qty: Decimal = Decimal("1")
+    work_price: Decimal | None = None
+    material_price: Decimal | None = None
+
+
+class LinePatch(BaseModel):
+    name: str | None = Field(default=None, max_length=500)
+    unit: str | None = Field(default=None, max_length=50)
+    qty: Decimal | None = None
+    work_price: Decimal | None = None
+    material_price: Decimal | None = None
+    sort_order: int | None = None
+
+
+class LineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    section_id: int
+    item_id: int | None
+    name: str
+    unit: str
+    qty: Decimal
+    work_price: Decimal
+    material_price: Decimal
+    sort_order: int
+    # purchase_price_snapshot НЕ здесь — добавится в Task 8 через роле-зависимую сериализацию
