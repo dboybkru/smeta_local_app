@@ -10,6 +10,10 @@ from app.catalog.models import CatalogItem, ItemPrice, PriceList
 # TODO(scale): при росте каталога заменить LIKE на tsvector+pg_trgm (спека §4)
 
 
+def _escape_like(q: str) -> str:
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def search_items(
     db: Session,
     q: str = "",
@@ -20,10 +24,10 @@ def search_items(
 ) -> tuple[list[CatalogItem], int]:
     query = select(CatalogItem)
     if q:
-        pattern = f"%{q.lower()}%"
+        pattern = f"%{_escape_like(q.lower())}%"
         query = query.where(
-            func.lower(CatalogItem.name).like(pattern)
-            | func.lower(CatalogItem.article).like(pattern)
+            func.lower(CatalogItem.name).like(pattern, escape="\\")
+            | func.lower(CatalogItem.article).like(pattern, escape="\\")
         )
     if supplier_id is not None:
         query = query.where(CatalogItem.supplier_id == supplier_id)

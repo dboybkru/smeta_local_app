@@ -68,3 +68,21 @@ def test_price_lists_by_supplier(client):
     assert len(lists) == 1
     assert lists[0]["version"] == 1
     assert lists[0]["filename"] == "bolid.xlsx"
+
+
+def test_search_wildcards_are_literal(client, db_session):
+    from app.catalog.models import CatalogItem, Supplier
+
+    admin = make_admin(client)
+    supplier = Supplier(name="S")
+    db_session.add(supplier)
+    db_session.commit()
+    db_session.add_all(
+        [
+            CatalogItem(supplier_id=supplier.id, name="Скидка 50%", article="A1"),
+            CatalogItem(supplier_id=supplier.id, name="Кабель 50м", article="A2"),
+        ]
+    )
+    db_session.commit()
+    items = client.get("/api/catalog/items?q=50%25", headers=admin).json()["items"]
+    assert [i["name"] for i in items] == ["Скидка 50%"]
