@@ -23,6 +23,15 @@ from app.core.db import get_db
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # реальный прайс Optimus ~7 МБ
+
+
+async def _read_limited(file: UploadFile) -> bytes:
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Файл больше 25 МБ")
+    return content
+
 
 def _load_tables_or_415(content: bytes, filename: str) -> dict:
     try:
@@ -111,7 +120,7 @@ def delete_price_level(level_id: int, db: Session = Depends(get_db)):
 
 @router.post("/catalog/inspect", response_model=InspectOut, dependencies=[Depends(require_admin)])
 async def inspect_file(file: UploadFile = File(...)):
-    tables = _load_tables_or_415(await file.read(), file.filename or "")
+    tables = _load_tables_or_415(await _read_limited(file), file.filename or "")
     sheets = []
     for name, rows in tables.items():
         header_row = parser.detect_header_row(rows)
@@ -149,7 +158,7 @@ async def import_file(
     except (ValueError, TypeError):
         raise HTTPException(status_code=422, detail="Невалидный JSON в sheets/mapping")
 
-    tables = _load_tables_or_415(await file.read(), file.filename or "")
+    tables = _load_tables_or_415(await _read_limited(file), file.filename or "")
     parsed: list[importer.ParsedRow] = []
     for sheet_name in sheet_names:
         if sheet_name not in tables:

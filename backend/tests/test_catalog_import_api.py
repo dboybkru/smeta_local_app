@@ -103,3 +103,12 @@ def test_inspect_bad_extension_415(client):
         "/api/catalog/inspect", files={"file": ("doc.pdf", b"%PDF")}, headers=admin
     )
     assert resp.status_code == 415
+
+
+def test_oversized_upload_413(client):
+    admin = make_admin(client)
+    big = b"x" * (25 * 1024 * 1024 + 1)
+    resp = client.post(
+        "/api/catalog/inspect", files={"file": ("big.xlsx", big)}, headers=admin
+    )
+    assert resp.status_code == 413
