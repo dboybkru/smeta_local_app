@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import models as _models  # noqa: F401  — регистрирует таблицы в metadata
+from app.catalog import models as _catalog_models  # noqa: F401
 from app.core.db import Base, get_db
 from app.main import app
 

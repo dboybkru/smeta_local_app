@@ -9,6 +9,7 @@ from alembic import context
 config = context.config
 
 from app.auth import models  # noqa: F401  — registers tables in metadata
+from app.catalog import models as catalog_models  # noqa: F401
 from app.core.config import settings  # noqa: E402
 from app.core.db import Base  # noqa: E402
 
