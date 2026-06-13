@@ -93,7 +93,7 @@ export default function ModelsSection({ version, onChanged }: Props) {
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead><tr className="border-b border-stone-300 text-left text-stone-500">
-            <th className="py-2">Провайдер</th><th>ID модели</th><th>Название</th><th>Вход ₽/1M</th><th>Выход ₽/1M</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
+            <th className="py-2">Провайдер</th><th>ID модели</th><th>Название</th><th>Вход (пров.)</th><th>Выход (пров.)</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
           <tbody>
             {visible.map((m) => (
               <tr key={m.id} className="border-b border-stone-200 align-top">

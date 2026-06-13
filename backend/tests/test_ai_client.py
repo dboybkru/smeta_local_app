@@ -77,17 +77,22 @@ def test_list_models_parses_ids():
     assert models[0]["input_price"] is None and models[0]["output_price"] is None
 
 
-def test_list_models_parses_pricing_per_million():
+def test_list_models_parses_pricing_raw_with_guard():
     from decimal import Decimal
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [
-            {"id": "gpt-x", "pricing": {"prompt": "0.0000025", "completion": "0.00001"}},
+            {"id": "ok", "pricing": {"prompt": "0.15", "completion": "0.6"}},
+            {"id": "overflow", "pricing": {"prompt": "999999999", "completion": "0.6"}},
             {"id": "no-price", "pricing": {}},
         ]})
 
     http = httpx.Client(transport=httpx.MockTransport(handler))
     models = client.list_models(_provider(), http=http)
-    assert models[0]["input_price"] == Decimal("2.5")
-    assert models[0]["output_price"] == Decimal("10")
-    assert models[1]["input_price"] is None and models[1]["output_price"] is None
+    # хранится как есть, без масштабирования
+    assert models[0]["input_price"] == Decimal("0.15")
+    assert models[0]["output_price"] == Decimal("0.6")
+    # значение >= 10^8 не влезает в Numeric(12,4) → None (не падаем)
+    assert models[1]["input_price"] is None
+    assert models[1]["output_price"] == Decimal("0.6")
+    assert models[2]["input_price"] is None and models[2]["output_price"] is None

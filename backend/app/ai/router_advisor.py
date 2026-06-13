@@ -31,7 +31,7 @@ def _catalog_text(db: Session) -> str:
     lines = []
     for m in rows:
         price = (
-            f"вход {m.input_price}/выход {m.output_price} ₽/1M"
+            f"вход {m.input_price}/выход {m.output_price} (ед. провайдера)"
             if m.input_price
             else "цена не указана"
         )

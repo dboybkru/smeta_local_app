@@ -9,15 +9,22 @@ from app.ai.models import AIProvider
 _TIMEOUT = 60.0
 
 
-def _per_million(raw: object) -> Decimal | None:
-    """OpenRouter-стиль: pricing.prompt/completion — цена за 1 токен (строка).
-    Переводим в цену за 1M токенов. Best-effort: при любой ошибке — None."""
+_PRICE_MAX = Decimal("100000000")  # Numeric(12,4): |v| должно быть < 10^8
+
+
+def _parse_price(raw: object) -> Decimal | None:
+    """Цена модели из провайдерского /models (в единицах провайдера — как есть).
+    Best-effort: при невалидном значении или выходе за диапазон колонки → None
+    (НЕ масштабируем: у VseGPT/AITunnel это не цена за 1 токен, ×1e6 даёт overflow)."""
     if raw is None:
         return None
     try:
-        return Decimal(str(raw)) * 1_000_000
+        v = Decimal(str(raw))
     except (InvalidOperation, ValueError, TypeError):
         return None
+    if v < 0 or v >= _PRICE_MAX:
+        return None
+    return v
 
 
 def _auth_headers(provider: AIProvider) -> dict[str, str]:
@@ -67,8 +74,8 @@ def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> li
     """GET /models → список моделей с ценами (best-effort) для автоимпорта в каталог.
 
     Возвращает [{"id": str, "input_price": Decimal|None, "output_price": Decimal|None}].
-    Цены парсятся из OpenRouter-стиля `pricing.{prompt,completion}` (за 1 токен → за 1M);
-    если провайдер их не отдаёт — None."""
+    Цены парсятся из `pricing.{prompt,completion}` как есть (в единицах провайдера);
+    если провайдер их не отдаёт или значение вне диапазона колонки — None."""
     owns = http is None
     http = http or httpx.Client(timeout=_TIMEOUT)
     try:
@@ -82,8 +89,8 @@ def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> li
             out.append(
                 {
                     "id": m["id"],
-                    "input_price": _per_million(pricing.get("prompt")),
-                    "output_price": _per_million(pricing.get("completion")),
+                    "input_price": _parse_price(pricing.get("prompt")),
+                    "output_price": _parse_price(pricing.get("completion")),
                 }
             )
         return out
