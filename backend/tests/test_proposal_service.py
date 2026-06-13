@@ -50,6 +50,10 @@ def test_generate_proposal_writes_blocks(db_session, monkeypatch):
     result = service.generate_proposal(est, profile)
     assert result["title"] == "Ремонт под ключ"
     assert result["advantages"] == ["Свои бригады"]
+    # generate_proposal прогоняет ответ через ProposalBlocks — ровно 7 нормализованных блоков
+    assert set(result.keys()) == {
+        "title", "subtitle", "pain", "solution", "advantages", "terms", "cta"
+    }
 
 
 def test_generate_proposal_raises_when_no_key(db_session, monkeypatch):
