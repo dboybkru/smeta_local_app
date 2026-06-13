@@ -10,3 +10,6 @@ dist/
 
 # graphify output (knowledge graph lives in D:/git/graphify-out, never commit)
 graphify-out/
+
+# brainstorm visual companion
+.superpowers/
