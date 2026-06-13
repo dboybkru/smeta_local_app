@@ -55,6 +55,7 @@ export default function EstimatesListPage() {
   }
 
   async function remove(id: number) {
+    if (!window.confirm("Удалить смету?")) return;
     setError("");
     try {
       await deleteEstimate(id);

@@ -4,7 +4,7 @@ import AppHeader from "../components/AppHeader";
 import EstimateHeader from "../components/estimate/EstimateHeader";
 import EstimateTotalsBar from "../components/estimate/EstimateTotalsBar";
 import SectionTable from "../components/estimate/SectionTable";
-import { listClients, type Client } from "../api/estimates";
+import { listClients, createClient, type Client } from "../api/estimates";
 import { useEstimate } from "../hooks/useEstimate";
 
 export default function EstimateEditorPage() {
@@ -31,10 +31,20 @@ export default function EstimateEditorPage() {
   const sections = est.branches[0]?.sections ?? [];
   const sectionTotals = (sid: number) => totals.sections.find((s) => s.section_id === sid);
 
+  async function handleCreateClient(name: string) {
+    try {
+      const client = await createClient(name);
+      setClients((cs) => [...cs, client]);
+      await e.patchEstimate({ client_id: client.id });
+    } catch {
+      // ошибка patch/создания отразится через e.error при следующем reload; молча не критично
+    }
+  }
+
   return (
     <Shell>
       {e.error && <p role="alert" className="mb-3 text-red-600">{e.error}</p>}
-      <EstimateHeader key={est.id} estimate={est} clients={clients} canEdit={e.canEdit} onPatch={e.patchEstimate} />
+      <EstimateHeader key={est.id} estimate={est} clients={clients} canEdit={e.canEdit} onPatch={e.patchEstimate} onCreateClient={handleCreateClient} />
 
       {sections.map((s) => (
         <SectionTable

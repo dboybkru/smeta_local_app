@@ -50,7 +50,7 @@ export default function SectionTable({
             <input
               value={markup}
               onChange={(e) => setMarkup(e.target.value)}
-              onBlur={() => markup !== section.markup_percent && onPatchSection({ markup_percent: markup })}
+              onBlur={() => Number(markup) !== Number(section.markup_percent) && onPatchSection({ markup_percent: markup })}
               className="w-16 rounded border border-stone-300 px-2 py-1"
             />
           </label>

@@ -14,20 +14,20 @@ afterEach(cleanup);
 
 describe("EstimateHeader", () => {
   it("shows object name and status", () => {
-    render(<EstimateHeader estimate={EST} clients={[]} canEdit onPatch={vi.fn()} />);
+    render(<EstimateHeader estimate={EST} clients={[]} canEdit onPatch={vi.fn()} onCreateClient={vi.fn()} />);
     expect(screen.getByDisplayValue("Склад")).toBeInTheDocument();
     expect(screen.getByLabelText("Статус")).toHaveValue("draft");
   });
 
   it("emits patch when VAT toggled", async () => {
     const onPatch = vi.fn();
-    render(<EstimateHeader estimate={EST} clients={[]} canEdit onPatch={onPatch} />);
+    render(<EstimateHeader estimate={EST} clients={[]} canEdit onPatch={onPatch} onCreateClient={vi.fn()} />);
     await userEvent.click(screen.getByLabelText("НДС"));
     expect(onPatch).toHaveBeenCalledWith({ vat_enabled: true });
   });
 
   it("read-only mode disables inputs for viewer", () => {
-    render(<EstimateHeader estimate={EST} clients={[]} canEdit={false} onPatch={vi.fn()} />);
+    render(<EstimateHeader estimate={EST} clients={[]} canEdit={false} onPatch={vi.fn()} onCreateClient={vi.fn()} />);
     expect(screen.getByLabelText("Статус")).toBeDisabled();
   });
 });

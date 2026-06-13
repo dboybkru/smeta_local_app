@@ -6,11 +6,12 @@ type Props = {
   clients: Client[];
   canEdit: boolean;
   onPatch: (patch: EstimatePatch) => void;
+  onCreateClient: (name: string) => void;
 };
 
 const STATUSES = ["draft", "sent", "approved", "archived"];
 
-export default function EstimateHeader({ estimate, clients, canEdit, onPatch }: Props) {
+export default function EstimateHeader({ estimate, clients, canEdit, onPatch, onCreateClient }: Props) {
   const [name, setName] = useState(estimate.object_name);
 
   return (
@@ -38,6 +39,18 @@ export default function EstimateHeader({ estimate, clients, canEdit, onPatch }: 
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                const n = window.prompt("Название клиента");
+                if (n && n.trim()) onCreateClient(n.trim());
+              }}
+              className="text-xs text-stone-500 hover:text-stone-800"
+            >
+              + клиент
+            </button>
+          )}
         </label>
         <label className="flex items-center gap-1">
           <input
@@ -56,7 +69,7 @@ export default function EstimateHeader({ estimate, clients, canEdit, onPatch }: 
               aria-label="Ставка НДС"
               disabled={!canEdit}
               defaultValue={estimate.vat_rate}
-              onBlur={(e) => e.target.value !== estimate.vat_rate && onPatch({ vat_rate: e.target.value })}
+              onBlur={(e) => Number(e.target.value) !== Number(estimate.vat_rate) && onPatch({ vat_rate: e.target.value })}
               className="w-16 rounded border border-stone-300 px-2 py-1"
             />
           </label>
