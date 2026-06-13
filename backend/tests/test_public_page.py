@@ -64,10 +64,27 @@ def test_public_watermark_present(client, db_session):
     assert "ЧЕРНОВИК" in client.get(f"/p/{link.token}").text
 
 
-def test_public_pdf_ok(client, db_session, monkeypatch):
+def test_public_pdf_ok_and_no_leak_in_html(client, db_session, monkeypatch):
     est, link = _estimate_with_link(db_session, token="tok-pdf")
-    monkeypatch.setattr(public_router.render, "html_to_pdf", lambda html: b"%PDF-1.7 mock")
+    # spy: захватываем HTML, который уходит в рендер PDF — закупка не должна туда попасть
+    captured = {}
+    monkeypatch.setattr(
+        public_router.render,
+        "html_to_pdf",
+        lambda html: (captured.__setitem__("html", html) or b"%PDF-1.7 mock"),
+    )
     r = client.get(f"/p/{link.token}/pdf")
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.content[:4] == b"%PDF"
+    assert "333" not in captured["html"]  # закупочная цена не утекла в PDF
+    assert "Маржа" not in captured["html"]
+
+
+def test_public_cover_level_omits_full_only_blocks(client, db_session):
+    est, link = _estimate_with_link(db_session, token="tok-cover", level="cover")
+    est.proposal = {"title": "Заголовок КП", "pain": "Боль клиента", "cta": "Звоните"}
+    db_session.commit()
+    body = client.get(f"/p/{link.token}").text
+    assert "Заголовок КП" in body  # титул — на уровне cover есть
+    assert "Боль клиента" not in body  # pain — только на уровне full

@@ -32,4 +32,8 @@ def public_pdf(token: str, db: Session = Depends(get_db)):
     context, watermark = _context_for_link(db, token)
     html = render.render_html(context, watermark=watermark)
     pdf = render.html_to_pdf(html)
-    return Response(content=pdf, media_type="application/pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="proposal.pdf"'},
+    )
