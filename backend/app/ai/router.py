@@ -88,18 +88,35 @@ def refresh_models(
     if p is None:
         raise HTTPException(status_code=404, detail="Провайдер не найден")
     existing = {
-        m.model_id
+        m.model_id: m
         for m in db.scalars(select(AIModel).where(AIModel.provider_id == p.id)).all()
     }
     imported = 0
-    for mid in client.list_models(p):
+    updated = 0
+    for m in client.list_models(p):
+        mid = m["id"]
         if mid in existing:
+            # backfill цен у уже импортированных моделей (только если были пустые)
+            em = existing[mid]
+            changed = False
+            if em.input_price is None and m.get("input_price") is not None:
+                em.input_price = m["input_price"]
+                changed = True
+            if em.output_price is None and m.get("output_price") is not None:
+                em.output_price = m["output_price"]
+                changed = True
+            if changed:
+                updated += 1
             continue
-        db.add(AIModel(provider_id=p.id, model_id=mid, label=mid))
-        existing.add(mid)
+        new_m = AIModel(
+            provider_id=p.id, model_id=mid, label=mid,
+            input_price=m.get("input_price"), output_price=m.get("output_price"),
+        )
+        db.add(new_m)
+        existing[mid] = new_m
         imported += 1
     db.commit()
-    return {"imported": imported}
+    return {"imported": imported, "updated": updated}
 
 
 @router.get("/models", response_model=list[schemas.ModelOut])

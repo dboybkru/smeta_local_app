@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 import httpx
 
 from app.ai import crypto
@@ -5,6 +7,17 @@ from app.ai.errors import AIError
 from app.ai.models import AIProvider
 
 _TIMEOUT = 60.0
+
+
+def _per_million(raw: object) -> Decimal | None:
+    """OpenRouter-стиль: pricing.prompt/completion — цена за 1 токен (строка).
+    Переводим в цену за 1M токенов. Best-effort: при любой ошибке — None."""
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw)) * 1_000_000
+    except (InvalidOperation, ValueError, TypeError):
+        return None
 
 
 def _auth_headers(provider: AIProvider) -> dict[str, str]:
@@ -50,8 +63,12 @@ def chat_completion(
             http.close()
 
 
-def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> list[str]:
-    """GET /models → список id (для автоимпорта в каталог)."""
+def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> list[dict]:
+    """GET /models → список моделей с ценами (best-effort) для автоимпорта в каталог.
+
+    Возвращает [{"id": str, "input_price": Decimal|None, "output_price": Decimal|None}].
+    Цены парсятся из OpenRouter-стиля `pricing.{prompt,completion}` (за 1 токен → за 1M);
+    если провайдер их не отдаёт — None."""
     owns = http is None
     http = http or httpx.Client(timeout=_TIMEOUT)
     try:
@@ -59,7 +76,17 @@ def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> li
             f"{_base(provider)}/models", headers=_auth_headers(provider), timeout=_TIMEOUT
         )
         resp.raise_for_status()
-        return [m["id"] for m in resp.json().get("data", [])]
+        out: list[dict] = []
+        for m in resp.json().get("data", []):
+            pricing = m.get("pricing") or {}
+            out.append(
+                {
+                    "id": m["id"],
+                    "input_price": _per_million(pricing.get("prompt")),
+                    "output_price": _per_million(pricing.get("completion")),
+                }
+            )
+        return out
     except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise AIError(f"{provider.name}: {exc}") from exc
     finally:

@@ -10,6 +10,7 @@ export default function ModelsSection({ version, onChanged }: Props) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [models, setModels] = useState<AiModel[]>([]);
   const [filter, setFilter] = useState<number | "">("");
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -51,29 +52,50 @@ export default function ModelsSection({ version, onChanged }: Props) {
     }
   }
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? models.filter((m) => `${m.model_id} ${m.label}`.toLowerCase().includes(q))
+    : [];
+
   return (
     <section className="mb-10">
       <h2 className="mb-3 font-serif text-lg text-stone-900">Модели</h2>
       {error && <p role="alert" className="mb-2 text-red-600">{error}</p>}
 
-      <label className="mb-4 block text-sm text-stone-600">
-        <span className="mb-1 block">Провайдер</span>
-        <select aria-label="Фильтр по провайдеру" value={filter}
-          onChange={(e) => setFilter(e.target.value === "" ? "" : Number(e.target.value))}
-          className="rounded border border-stone-300 px-2 py-1">
-          <option value="">Все</option>
-          {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </label>
+      <div className="mb-2 flex flex-wrap items-end gap-3">
+        <label className="text-sm text-stone-600">
+          <span className="mb-1 block">Провайдер</span>
+          <select aria-label="Фильтр по провайдеру" value={filter}
+            onChange={(e) => setFilter(e.target.value === "" ? "" : Number(e.target.value))}
+            className="rounded border border-stone-300 px-2 py-1">
+            <option value="">Все</option>
+            {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm text-stone-600">
+          <span className="mb-1 block">Поиск модели</span>
+          <input aria-label="Поиск модели" value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="напр. gpt-4o, claude, gemini"
+            className="w-72 rounded border border-stone-300 px-2 py-1" />
+        </label>
+      </div>
+      <p className="mb-4 text-xs text-stone-500">
+        Всего моделей: {models.length}. Цены и «сильные стороны» необязательны — советник узнаёт модель по названию.
+      </p>
 
       {models.length === 0 ? (
         <p className="text-stone-500">Моделей нет — добавьте провайдера и нажмите «Импорт моделей».</p>
+      ) : !q ? (
+        <p className="text-stone-500">Введите название модели в поиск, чтобы найти и включить нужную.</p>
+      ) : visible.length === 0 ? (
+        <p className="text-stone-500">Ничего не найдено по запросу «{query}».</p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead><tr className="border-b border-stone-300 text-left text-stone-500">
             <th className="py-2">Провайдер</th><th>ID модели</th><th>Название</th><th>Вход ₽/1M</th><th>Выход ₽/1M</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
           <tbody>
-            {models.map((m) => (
+            {visible.map((m) => (
               <tr key={m.id} className="border-b border-stone-200 align-top">
                 <td className="py-2 text-stone-500">{providerName(m.provider_id)}</td>
                 <td className="font-mono text-xs">{m.model_id}</td>

@@ -18,10 +18,22 @@ function route(url: string) {
 }
 
 describe("ModelsSection", () => {
-  it("renders models table", async () => {
+  it("hides rows until a search query is entered, then shows match", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => route(url)));
     render(<ModelsSection version={0} onChanged={() => {}} />);
+    // before searching: hint shown, no model row
+    expect(await screen.findByText(/Введите название модели/)).toBeInTheDocument();
+    expect(screen.queryByText("gpt-4o")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Поиск модели"), "gpt");
     expect(await screen.findByText("gpt-4o")).toBeInTheDocument();
+  });
+
+  it("shows 'not found' for a non-matching query", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => route(url)));
+    render(<ModelsSection version={0} onChanged={() => {}} />);
+    await screen.findByText(/Введите название модели/);
+    await userEvent.type(screen.getByLabelText("Поиск модели"), "zzz");
+    expect(await screen.findByText(/Ничего не найдено/)).toBeInTheDocument();
   });
 
   it("saves input price on blur (PUT)", async () => {
@@ -31,6 +43,7 @@ describe("ModelsSection", () => {
     });
     vi.stubGlobal("fetch", f);
     render(<ModelsSection version={0} onChanged={() => {}} />);
+    await userEvent.type(await screen.findByLabelText("Поиск модели"), "gpt");
     const input = await screen.findByLabelText("Вход gpt-4o");
     await userEvent.type(input, "10");
     await userEvent.tab();

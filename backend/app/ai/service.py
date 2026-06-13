@@ -44,9 +44,10 @@ def call_llm(
     json_mode = json_schema is not None
     sent = list(messages)
     if json_mode:
+        schema_text = json.dumps(json_schema, ensure_ascii=False)
         sent = [
             {"role": "system",
-             "content": "Верни ТОЛЬКО валидный JSON по схеме: " + json.dumps(json_schema, ensure_ascii=False)},
+             "content": "Верни ТОЛЬКО валидный JSON по схеме: " + schema_text},
             *messages,
         ]
 

@@ -72,5 +72,22 @@ def test_list_models_parses_ids():
         return httpx.Response(200, json={"data": [{"id": "gpt-x"}, {"id": "claude-y"}]})
 
     http = httpx.Client(transport=httpx.MockTransport(handler))
-    ids = client.list_models(_provider(), http=http)
-    assert ids == ["gpt-x", "claude-y"]
+    models = client.list_models(_provider(), http=http)
+    assert [m["id"] for m in models] == ["gpt-x", "claude-y"]
+    assert models[0]["input_price"] is None and models[0]["output_price"] is None
+
+
+def test_list_models_parses_pricing_per_million():
+    from decimal import Decimal
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [
+            {"id": "gpt-x", "pricing": {"prompt": "0.0000025", "completion": "0.00001"}},
+            {"id": "no-price", "pricing": {}},
+        ]})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    models = client.list_models(_provider(), http=http)
+    assert models[0]["input_price"] == Decimal("2.5")
+    assert models[0]["output_price"] == Decimal("10")
+    assert models[1]["input_price"] is None and models[1]["output_price"] is None

@@ -83,7 +83,10 @@ export function deleteProvider(id: number) {
   return api<void>(`/ai/providers/${id}`, { method: "DELETE" });
 }
 export function refreshModels(providerId: number) {
-  return api<{ imported: number }>(`/ai/providers/${providerId}/models/refresh`, { method: "POST" });
+  return api<{ imported: number; updated: number }>(
+    `/ai/providers/${providerId}/models/refresh`,
+    { method: "POST" },
+  );
 }
 export function listModels(providerId?: number) {
   const q = providerId != null ? `?provider_id=${providerId}` : "";

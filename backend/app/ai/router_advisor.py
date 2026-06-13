@@ -30,8 +30,14 @@ def _catalog_text(db: Session) -> str:
     providers = {p.id: p.name for p in db.scalars(select(AIProvider)).all()}
     lines = []
     for m in rows:
-        price = f"вход {m.input_price}/выход {m.output_price} ₽/1M" if m.input_price else "цена не указана"
-        lines.append(f"- {providers.get(m.provider_id, '?')}/{m.model_id}: {price}; {m.strengths or 'без заметки'}")
+        price = (
+            f"вход {m.input_price}/выход {m.output_price} ₽/1M"
+            if m.input_price
+            else "цена не указана"
+        )
+        prov = providers.get(m.provider_id, "?")
+        note = m.strengths or "без заметки"
+        lines.append(f"- {prov}/{m.model_id}: {price}; {note}")
     return "\n".join(lines) or "(каталог пуст)"
 
 

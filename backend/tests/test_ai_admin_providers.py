@@ -57,7 +57,11 @@ def test_refresh_models_imports_ids(client_app, db_session, monkeypatch):
     pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
         "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
         "api_key": "k"}).json()["id"]
-    monkeypatch.setattr(client, "list_models", lambda prov, **kw: ["gpt-x", "claude-y", "gpt-x"])
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None},
+        {"id": "claude-y", "input_price": None, "output_price": None},
+        {"id": "gpt-x", "input_price": None, "output_price": None},
+    ])
     r = client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
     assert r.status_code == 200, r.text
     assert r.json()["imported"] == 2
@@ -68,12 +72,48 @@ def test_refresh_models_imports_ids(client_app, db_session, monkeypatch):
     assert len(models2) == 2
 
 
+def test_refresh_models_imports_pricing(client_app, db_session, monkeypatch):
+    from decimal import Decimal
+    a = _admin(db_session)
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
+        "api_key": "k"}).json()["id"]
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": Decimal("2.5"), "output_price": Decimal("10")},
+    ])
+    client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    m = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]
+    assert m["input_price"] == "2.5000"
+    assert m["output_price"] == "10.0000"
+
+
+def test_refresh_backfills_prices_on_existing(client_app, db_session, monkeypatch):
+    from decimal import Decimal
+    a = _admin(db_session)
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
+        "api_key": "k"}).json()["id"]
+    # первый импорт — без цен
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None}])
+    client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    # повторный импорт — провайдер теперь отдаёт цены → backfill
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": Decimal("2.5"), "output_price": Decimal("10")}])
+    r = client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    assert r.json() == {"imported": 0, "updated": 1}
+    m = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]
+    assert m["input_price"] == "2.5000"
+    assert m["output_price"] == "10.0000"
+
+
 def test_update_model_price(client_app, db_session, monkeypatch):
     a = _admin(db_session)
     pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
         "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
         "api_key": "k"}).json()["id"]
-    monkeypatch.setattr(client, "list_models", lambda prov, **kw: ["gpt-x"])
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None}])
     client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
     mid = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]["id"]
     r = client_app.put(f"/api/ai/models/{mid}", headers=_hdr(a),

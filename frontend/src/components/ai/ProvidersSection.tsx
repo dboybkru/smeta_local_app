@@ -42,7 +42,8 @@ export default function ProvidersSection({ version, onChanged }: Props) {
     setError(""); setNotice("");
     try {
       const r = await refreshModels(p.id);
-      setNotice(`Импортировано моделей: ${r.imported}`);
+      const extra = r.updated ? `, цены дозаполнены: ${r.updated}` : "";
+      setNotice(`Импортировано моделей: ${r.imported}${extra}`);
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка импорта");
