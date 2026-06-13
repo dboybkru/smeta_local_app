@@ -27,6 +27,12 @@ def _parse_price(raw: object) -> Decimal | None:
     return v
 
 
+def _strengths(m: dict) -> str:
+    """Краткое описание модели из провайдерского /models (description/name), обрезанное."""
+    s = m.get("description") or m.get("name") or ""
+    return str(s).strip()[:300]
+
+
 def _auth_headers(provider: AIProvider) -> dict[str, str]:
     key = crypto.decrypt(provider.api_key_encrypted) if provider.api_key_encrypted else ""
     if provider.auth_style == "x_api_key":
@@ -73,9 +79,10 @@ def chat_completion(
 def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> list[dict]:
     """GET /models → список моделей с ценами (best-effort) для автоимпорта в каталог.
 
-    Возвращает [{"id": str, "input_price": Decimal|None, "output_price": Decimal|None}].
+    Возвращает [{"id", "input_price", "output_price", "strengths"}].
     Цены парсятся из `pricing.{prompt,completion}` как есть (в единицах провайдера);
-    если провайдер их не отдаёт или значение вне диапазона колонки — None."""
+    если провайдер их не отдаёт или значение вне диапазона колонки — None.
+    strengths — из `description`/`name` модели (обрезано)."""
     owns = http is None
     http = http or httpx.Client(timeout=_TIMEOUT)
     try:
@@ -91,6 +98,7 @@ def list_models(provider: AIProvider, *, http: httpx.Client | None = None) -> li
                     "id": m["id"],
                     "input_price": _parse_price(pricing.get("prompt")),
                     "output_price": _parse_price(pricing.get("completion")),
+                    "strengths": _strengths(m),
                 }
             )
         return out

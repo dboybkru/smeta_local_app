@@ -96,7 +96,7 @@ def refresh_models(
     for m in client.list_models(p):
         mid = m["id"]
         if mid in existing:
-            # backfill цен у уже импортированных моделей (только если были пустые)
+            # backfill пустых полей у уже импортированных моделей
             em = existing[mid]
             changed = False
             if em.input_price is None and m.get("input_price") is not None:
@@ -105,12 +105,16 @@ def refresh_models(
             if em.output_price is None and m.get("output_price") is not None:
                 em.output_price = m["output_price"]
                 changed = True
+            if not em.strengths and m.get("strengths"):
+                em.strengths = m["strengths"]
+                changed = True
             if changed:
                 updated += 1
             continue
         new_m = AIModel(
             provider_id=p.id, model_id=mid, label=mid,
             input_price=m.get("input_price"), output_price=m.get("output_price"),
+            strengths=m.get("strengths") or "",
         )
         db.add(new_m)
         existing[mid] = new_m
@@ -195,6 +199,11 @@ def router_recommend(db: Session = Depends(get_db), user: User = Depends(require
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+# Запас токенов для смоук-тестов: reasoning-модели тратят часть бюджета на
+# рассуждения, при маленьком max_tokens ответ пустой/ошибка — берём с запасом.
+_SMOKE_MAX_TOKENS = 1000
+
+
 # --- purpose smoke test ---
 @router.post("/purposes/{key}/test")
 def test_purpose(
@@ -203,7 +212,32 @@ def test_purpose(
     user: User = Depends(require_admin),
 ):
     try:
-        service.call_llm(db, key, [{"role": "user", "content": "ping"}], max_tokens=16)
+        service.call_llm(
+            db, key, [{"role": "user", "content": "ping"}], max_tokens=_SMOKE_MAX_TOKENS
+        )
         return {"ok": True, "detail": ""}
     except (AINotConfigured, AIError) as exc:
+        return {"ok": False, "detail": str(exc)}
+
+
+# --- single model smoke test ---
+@router.post("/models/{model_id}/test")
+def test_model(
+    model_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    m = db.get(AIModel, model_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Модель не найдена")
+    p = db.get(AIProvider, m.provider_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Провайдер не найден")
+    try:
+        client.chat_completion(
+            p, m.model_id, [{"role": "user", "content": "ping"}],
+            max_tokens=_SMOKE_MAX_TOKENS,
+        )
+        return {"ok": True, "detail": ""}
+    except AIError as exc:
         return {"ok": False, "detail": str(exc)}

@@ -110,3 +110,6 @@ export function recommend() {
 export function testPurpose(key: string) {
   return api<{ ok: boolean; detail: string }>(`/ai/purposes/${key}/test`, { method: "POST" });
 }
+export function testModel(id: number) {
+  return api<{ ok: boolean; detail: string }>(`/ai/models/${id}/test`, { method: "POST" });
+}

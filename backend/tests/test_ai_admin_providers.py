@@ -107,6 +107,29 @@ def test_refresh_backfills_prices_on_existing(client_app, db_session, monkeypatc
     assert m["output_price"] == "10.0000"
 
 
+def test_model_smoke_test_endpoint(client_app, db_session, monkeypatch):
+    from app.ai.errors import AIError
+    a = _admin(db_session)
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
+        "api_key": "k"}).json()["id"]
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None}])
+    client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    mid = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]["id"]
+
+    monkeypatch.setattr(client, "chat_completion", lambda *args, **kw: "pong")
+    ok = client_app.post(f"/api/ai/models/{mid}/test", headers=_hdr(a))
+    assert ok.json() == {"ok": True, "detail": ""}
+
+    def boom(*args, **kw):
+        raise AIError("403 Forbidden")
+    monkeypatch.setattr(client, "chat_completion", boom)
+    bad = client_app.post(f"/api/ai/models/{mid}/test", headers=_hdr(a))
+    assert bad.json()["ok"] is False
+    assert "403" in bad.json()["detail"]
+
+
 def test_update_model_price(client_app, db_session, monkeypatch):
     a = _admin(db_session)
     pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  deleteModel, listModels, listProviders, updateModel,
+  deleteModel, listModels, listProviders, testModel, updateModel,
   type AiModel, type ModelPatch, type Provider,
 } from "../../api/ai";
 
@@ -12,6 +12,7 @@ export default function ModelsSection({ version, onChanged }: Props) {
   const [filter, setFilter] = useState<number | "">("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [tests, setTests] = useState<Record<number, { ok: boolean; detail: string } | "...">>({});
 
   async function load() {
     try {
@@ -55,6 +56,16 @@ export default function ModelsSection({ version, onChanged }: Props) {
   async function toggleFromSearch(m: AiModel) {
     await save(m, { enabled: !m.enabled });
     setQuery("");
+  }
+
+  async function runTest(m: AiModel) {
+    setTests((cur) => ({ ...cur, [m.id]: "..." }));
+    try {
+      const res = await testModel(m.id);
+      setTests((cur) => ({ ...cur, [m.id]: res }));
+    } catch (err) {
+      setTests((cur) => ({ ...cur, [m.id]: { ok: false, detail: err instanceof Error ? err.message : "Ошибка" } }));
+    }
   }
 
   const q = query.trim().toLowerCase();
@@ -139,7 +150,14 @@ export default function ModelsSection({ version, onChanged }: Props) {
                     className="w-40 rounded border border-stone-300 px-1 py-0.5" />
                 </td>
                 <td><input type="checkbox" aria-label={`Включена ${m.model_id}`} checked={m.enabled} onChange={() => void save(m, { enabled: !m.enabled })} /></td>
-                <td className="text-right">
+                <td className="space-x-2 whitespace-nowrap text-right">
+                  <button onClick={() => void runTest(m)} className="rounded border border-stone-500 px-2 py-1 text-stone-600">Тест</button>
+                  {tests[m.id] === "..." && <span className="text-stone-400">…</span>}
+                  {tests[m.id] && tests[m.id] !== "..." && (
+                    <span className={(tests[m.id] as { ok: boolean }).ok ? "text-green-700" : "text-red-600"}>
+                      {(tests[m.id] as { ok: boolean; detail: string }).ok ? "✓" : `✗ ${(tests[m.id] as { ok: boolean; detail: string }).detail}`}
+                    </span>
+                  )}
                   <button onClick={() => void remove(m)} className="rounded border border-red-700 px-2 py-1 text-red-700">Удалить</button>
                 </td>
               </tr>

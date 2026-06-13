@@ -96,3 +96,18 @@ def test_list_models_parses_pricing_raw_with_guard():
     assert models[1]["input_price"] is None
     assert models[1]["output_price"] == Decimal("0.6")
     assert models[2]["input_price"] is None and models[2]["output_price"] is None
+
+
+def test_list_models_parses_strengths_from_description():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [
+            {"id": "a", "description": "Fast and cheap"},
+            {"id": "b", "name": "Big model"},
+            {"id": "c"},
+        ]})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    models = client.list_models(_provider(), http=http)
+    assert models[0]["strengths"] == "Fast and cheap"
+    assert models[1]["strengths"] == "Big model"
+    assert models[2]["strengths"] == ""

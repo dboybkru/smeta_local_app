@@ -49,6 +49,21 @@ describe("ModelsSection", () => {
     expect(await screen.findByText(/Ничего не найдено/)).toBeInTheDocument();
   });
 
+  it("runs a per-model smoke test and shows the result", async () => {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST" && url.includes("/models/10/test"))
+        return json({ ok: true, detail: "" });
+      return route(url);
+    });
+    vi.stubGlobal("fetch", f);
+    render(<ModelsSection version={0} onChanged={() => {}} />);
+    await screen.findByText("gpt-4o");
+    await userEvent.click(screen.getByText("Тест"));
+    expect(await screen.findByText("✓")).toBeInTheDocument();
+    const posts = f.mock.calls.filter((c) => ((c[1] as RequestInit)?.method ?? "GET") === "POST");
+    expect(posts.some((c) => String(c[0]).includes("/models/10/test"))).toBe(true);
+  });
+
   it("saves input price on blur for an enabled model (PUT)", async () => {
     const f = vi.fn(async (url: string, init?: RequestInit) => {
       if ((init?.method ?? "GET") === "PUT") return json({ ...ON, input_price: "10" });
