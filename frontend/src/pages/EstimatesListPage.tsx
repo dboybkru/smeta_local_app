@@ -13,7 +13,7 @@ import {
 
 export default function EstimatesListPage() {
   const { user } = useAuth();
-  const canEdit = user == null || user?.role === "estimator" || user?.role === "admin";
+  const canEdit = user?.role === "estimator" || user?.role === "admin";
   const navigate = useNavigate();
   const [items, setItems] = useState<Estimate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);

@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../auth/AuthContext";
+import * as authModule from "../auth/AuthContext";
 import EstimatesListPage from "./EstimatesListPage";
 
 function json(data: unknown, status = 200) {
@@ -17,6 +18,13 @@ function router(map: Record<string, unknown>) {
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+function stubUser(role = "estimator") {
+  vi.spyOn(authModule, "useAuth").mockReturnValue({
+    user: { id: 1, email: "a@b.c", name: "A", role, status: "active" },
+    loginWithPassword: vi.fn(), acceptTokens: vi.fn(), logout: vi.fn(),
+  });
+}
+
 function renderPage() {
   return render(<MemoryRouter><AuthProvider><EstimatesListPage /></AuthProvider></MemoryRouter>);
 }
@@ -26,6 +34,7 @@ const LIST = [{ id: 1, client_id: null, owner_id: 1, object_name: "Склад", 
 describe("EstimatesListPage", () => {
   it("lists estimates", async () => {
     vi.stubGlobal("fetch", router({ "/api/estimates": LIST, "/api/clients": [] }));
+    stubUser();
     renderPage();
     expect(await screen.findByText("Склад")).toBeInTheDocument();
   });
@@ -33,6 +42,7 @@ describe("EstimatesListPage", () => {
   it("creates an estimate (POST fires)", async () => {
     const f = router({ "/api/estimates": LIST, "/api/clients": [] });
     vi.stubGlobal("fetch", f);
+    stubUser();
     renderPage();
     await screen.findByText("Склад");
     await userEvent.type(screen.getByPlaceholderText("Название объекта"), "Новый объект");
