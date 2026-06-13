@@ -9,6 +9,7 @@ from app.catalog import models as _catalog_models  # noqa: F401
 from app.core.db import Base, get_db
 from app.estimates import models as _estimate_models  # noqa: F401
 from app.profile import models as _profile_models  # noqa: F401
+from app.publiclinks import models as _publiclink_models  # noqa: F401
 from app.main import app
 
 
