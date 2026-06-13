@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { ProposalBlocks } from "./proposals";
 
 // Money & qty are JSON strings (backend Decimal).
 export type Branch = { id: number; name: string; parent_branch_id: number | null };
@@ -56,6 +57,7 @@ export type EstimateTotals = {
 export type EstimateDetail = Omit<Estimate, "branches"> & {
   branches: BranchDetail[];
   totals: EstimateTotals;
+  proposal: ProposalBlocks | null;
 };
 
 export type Client = {
