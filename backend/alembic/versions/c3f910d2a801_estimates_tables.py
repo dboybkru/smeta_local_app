@@ -45,7 +45,7 @@ def upgrade() -> None:
         sa.Column(
             'status', sa.String(length=20), server_default=sa.text("'draft'"), nullable=False
         ),
-        sa.Column('vat_enabled', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+        sa.Column('vat_enabled', sa.Boolean(), server_default=sa.text('false'), nullable=False),
         sa.Column(
             'vat_rate',
             sa.Numeric(precision=5, scale=2),
