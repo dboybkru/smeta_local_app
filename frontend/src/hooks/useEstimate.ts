@@ -54,7 +54,8 @@ export function useEstimate(id: number) {
     loading,
     error,
     reload,
-    canEdit: user?.role !== "viewer",
+    // allowlist (а не «не viewer»): пока user грузится (undefined) — правок нет
+    canEdit: user?.role === "estimator" || user?.role === "admin",
     patchEstimate: wrap((patch: EstimatePatch) => apiPatchEstimate(id, patch)),
     addSection: wrap((body: { name?: string; markup_percent?: string }) => apiAddSection(id, body)),
     patchSection: wrap((sid: number, patch: Parameters<typeof apiPatchSection>[1]) =>
