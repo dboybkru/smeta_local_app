@@ -52,19 +52,23 @@ export default function ModelsSection({ version, onChanged }: Props) {
     }
   }
 
-  const LIMIT = 50;
+  async function toggleFromSearch(m: AiModel) {
+    await save(m, { enabled: !m.enabled });
+    setQuery("");
+  }
+
   const q = query.trim().toLowerCase();
-  const matched = q
-    ? models.filter((m) => `${m.model_id} ${m.label}`.toLowerCase().includes(q))
-    : models;
-  const visible = matched.slice(0, LIMIT);
+  const matches = q
+    ? models.filter((m) => `${m.model_id} ${m.label}`.toLowerCase().includes(q)).slice(0, 12)
+    : [];
+  const enabledModels = models.filter((m) => m.enabled);
 
   return (
     <section className="mb-10">
       <h2 className="mb-3 font-serif text-lg text-stone-900">Модели</h2>
       {error && <p role="alert" className="mb-2 text-red-600">{error}</p>}
 
-      <div className="mb-2 flex flex-wrap items-end gap-3">
+      <div className="mb-1 flex flex-wrap items-end gap-3">
         <label className="text-sm text-stone-600">
           <span className="mb-1 block">Провайдер</span>
           <select aria-label="Фильтр по провайдеру" value={filter}
@@ -74,28 +78,43 @@ export default function ModelsSection({ version, onChanged }: Props) {
             {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <label className="text-sm text-stone-600">
+        <div className="relative text-sm text-stone-600">
           <span className="mb-1 block">Поиск модели</span>
           <input aria-label="Поиск модели" value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="напр. gpt-4o, claude, gemini"
             className="w-72 rounded border border-stone-300 px-2 py-1" />
-        </label>
+          {q && (
+            <ul className="absolute z-10 mt-1 max-h-72 w-72 overflow-auto rounded border border-stone-300 bg-white shadow">
+              {matches.length === 0 ? (
+                <li className="px-2 py-1 text-stone-400">Ничего не найдено</li>
+              ) : matches.map((m) => (
+                <li key={m.id}>
+                  <button type="button" onClick={() => void toggleFromSearch(m)}
+                    className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left hover:bg-stone-100">
+                    <span><span className="text-stone-400">{providerName(m.provider_id)} / </span>{m.label}</span>
+                    <span className={m.enabled ? "text-green-700" : "text-stone-400"}>{m.enabled ? "вкл ✓" : "включить"}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       <p className="mb-4 text-xs text-stone-500">
-        Всего моделей: {models.length}. Цены и «сильные стороны» необязательны — советник узнаёт модель по названию.
+        Всего моделей: {models.length}. Найдите модель в поиске и нажмите, чтобы включить.
+        Цены и «сильные стороны» необязательны — советник узнаёт модель по названию.
       </p>
 
-      {models.length === 0 ? (
-        <p className="text-stone-500">Моделей нет — добавьте провайдера и нажмите «Импорт моделей».</p>
-      ) : matched.length === 0 ? (
-        <p className="text-stone-500">Ничего не найдено по запросу «{query}».</p>
+      <h3 className="mb-2 text-sm font-medium text-stone-700">Включённые модели</h3>
+      {enabledModels.length === 0 ? (
+        <p className="text-stone-500">Нет включённых моделей — найдите нужную через поиск выше и нажмите, чтобы включить.</p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead><tr className="border-b border-stone-300 text-left text-stone-500">
             <th className="py-2">Провайдер</th><th>ID модели</th><th>Название</th><th>Вход (пров.)</th><th>Выход (пров.)</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
           <tbody>
-            {visible.map((m) => (
+            {enabledModels.map((m) => (
               <tr key={m.id} className="border-b border-stone-200 align-top">
                 <td className="py-2 text-stone-500">{providerName(m.provider_id)}</td>
                 <td className="font-mono text-xs">{m.model_id}</td>
@@ -127,11 +146,6 @@ export default function ModelsSection({ version, onChanged }: Props) {
             ))}
           </tbody>
         </table>
-      )}
-      {matched.length > LIMIT && (
-        <p className="mt-2 text-xs text-stone-500">
-          Показаны первые {LIMIT} из {matched.length}. Уточните поиск, чтобы найти нужную модель.
-        </p>
       )}
     </section>
   );

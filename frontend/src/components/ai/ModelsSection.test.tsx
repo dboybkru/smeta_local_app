@@ -9,37 +9,49 @@ function json(data: unknown, status = 200) {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const PROV = { id: 1, name: "VseGPT", base_url: "u", auth_style: "x_api_key", enabled: true, has_key: true };
-const M = { id: 10, provider_id: 1, model_id: "gpt-4o", label: "GPT-4o", input_price: null, output_price: null, strengths: "", enabled: true };
+const ON = { id: 10, provider_id: 1, model_id: "gpt-4o", label: "GPT-4o", input_price: null, output_price: null, strengths: "", enabled: true };
+const OFF = { id: 11, provider_id: 1, model_id: "gpt-4o-mini", label: "GPT-4o-mini", input_price: null, output_price: null, strengths: "", enabled: false };
 
 function route(url: string) {
   if (url.includes("/ai/providers")) return json([PROV]);
-  if (url.includes("/ai/models")) return json([M]);
+  if (url.includes("/ai/models")) return json([ON, OFF]);
   return json([]);
 }
 
 describe("ModelsSection", () => {
-  it("shows models by default and filters by search", async () => {
+  it("lists only enabled models, hides disabled ones from the table", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => route(url)));
     render(<ModelsSection version={0} onChanged={() => {}} />);
-    // visible without typing
-    expect(await screen.findByText("gpt-4o")).toBeInTheDocument();
-    // narrowing search keeps the match
-    await userEvent.type(screen.getByLabelText("Поиск модели"), "gpt");
-    expect(screen.getByText("gpt-4o")).toBeInTheDocument();
+    expect(await screen.findByText("gpt-4o")).toBeInTheDocument(); // enabled, in table
+    expect(screen.queryByText("gpt-4o-mini")).not.toBeInTheDocument(); // disabled, not in table
   });
 
-  it("shows 'not found' for a non-matching query", async () => {
+  it("search shows a dropdown; clicking a result enables it (PUT)", async () => {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "PUT") return json({ ...OFF, enabled: true });
+      return route(url);
+    });
+    vi.stubGlobal("fetch", f);
+    render(<ModelsSection version={0} onChanged={() => {}} />);
+    await screen.findByText("gpt-4o");
+    await userEvent.type(screen.getByLabelText("Поиск модели"), "mini");
+    await userEvent.click(await screen.findByText("GPT-4o-mini")); // dropdown item
+    const puts = f.mock.calls.filter((c) => (c[1] as RequestInit)?.method === "PUT");
+    expect(puts.length).toBe(1);
+    expect(JSON.parse((puts[0][1] as RequestInit).body as string)).toEqual({ enabled: true });
+  });
+
+  it("shows 'not found' in the dropdown for a non-matching query", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => route(url)));
     render(<ModelsSection version={0} onChanged={() => {}} />);
     await screen.findByText("gpt-4o");
     await userEvent.type(screen.getByLabelText("Поиск модели"), "zzz");
     expect(await screen.findByText(/Ничего не найдено/)).toBeInTheDocument();
-    expect(screen.queryByText("gpt-4o")).not.toBeInTheDocument();
   });
 
-  it("saves input price on blur (PUT)", async () => {
+  it("saves input price on blur for an enabled model (PUT)", async () => {
     const f = vi.fn(async (url: string, init?: RequestInit) => {
-      if ((init?.method ?? "GET") === "PUT") return json({ ...M, input_price: "10" });
+      if ((init?.method ?? "GET") === "PUT") return json({ ...ON, input_price: "10" });
       return route(url);
     });
     vi.stubGlobal("fetch", f);
