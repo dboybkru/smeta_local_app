@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../auth/AuthContext";
+import * as authModule from "../auth/AuthContext";
 import ImportPage from "./ImportPage";
 
 function json(data: unknown, status = 200) {
@@ -67,5 +68,27 @@ describe("ImportPage", () => {
     await waitFor(() => expect(screen.getByText(/Импорт завершён/)).toBeInTheDocument());
     expect(screen.getByText(/строка 4: отрицательная цена/)).toBeInTheDocument();
     expect(screen.getByText(/Создано:\s*2/)).toBeInTheDocument();
+  });
+
+  it("creates a supplier inline and selects it", async () => {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "POST" && url === "/api/suppliers")
+        return json({ id: 9, name: "Новый", column_mapping_template: null }, 201);
+      if (url.startsWith("/api/suppliers")) return json([]);
+      if (url.startsWith("/api/price-levels")) return json([]);
+      return json([]);
+    });
+    vi.stubGlobal("fetch", f);
+    vi.spyOn(authModule, "useAuth").mockReturnValue({
+      user: { id: 1, email: "a@b.c", name: "A", role: "admin", status: "active" },
+      loginWithPassword: vi.fn(), acceptTokens: vi.fn(), logout: vi.fn(),
+    });
+    render(<MemoryRouter><AuthProvider><ImportPage /></AuthProvider></MemoryRouter>);
+    await userEvent.click(await screen.findByText("+ новый"));
+    await userEvent.type(screen.getByPlaceholderText("Имя поставщика"), "Новый");
+    await userEvent.click(screen.getByText("Создать"));
+    const select = await screen.findByLabelText("Поставщик");
+    expect((select as HTMLSelectElement).value).toBe("9");
+    expect(await screen.findByRole("option", { name: "Новый" })).toBeInTheDocument();
   });
 });

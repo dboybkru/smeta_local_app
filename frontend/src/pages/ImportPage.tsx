@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../components/AppHeader";
 import ColumnMapper from "../components/ColumnMapper";
 import {
+  createSupplier,
   importFile,
   inspectFile,
   listPriceLevels,
@@ -12,6 +13,7 @@ import {
   type PriceLevel,
   type Supplier,
 } from "../api/catalog";
+import { ApiError } from "../api/client";
 
 type Step = "upload" | "map" | "result";
 
@@ -24,6 +26,8 @@ export default function ImportPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [levels, setLevels] = useState<PriceLevel[]>([]);
   const [supplierId, setSupplierId] = useState<number | "">("");
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
   const [kind, setKind] = useState<"material" | "work">("material");
   const [file, setFile] = useState<File | null>(null);
   const [inspectResult, setInspectResult] = useState<InspectResult | null>(null);
@@ -49,6 +53,22 @@ export default function ImportPage() {
     const sheet = inspectResult?.sheets.find((s) => s.name === selectedSheets[0]);
     return sheet?.columns ?? [];
   }, [inspectResult, selectedSheets]);
+
+  async function addSupplier() {
+    const nm = newSupplierName.trim();
+    if (!nm) return;
+    setError("");
+    try {
+      const sup = await createSupplier(nm);
+      setSuppliers((cur) => [...cur, sup]);
+      setSupplierId(sup.id);
+      setNewSupplierName("");
+      setCreatingSupplier(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) setError("Поставщик с таким именем уже существует");
+      else setError(err instanceof Error ? err.message : "Ошибка создания поставщика");
+    }
+  }
 
   async function doInspect() {
     if (supplierId === "" || !file) {
@@ -137,6 +157,27 @@ export default function ImportPage() {
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
+              {!creatingSupplier ? (
+                <button
+                  type="button"
+                  onClick={() => setCreatingSupplier(true)}
+                  className="ml-2 text-stone-600 underline"
+                >
+                  + новый
+                </button>
+              ) : (
+                <span className="ml-2 inline-flex items-center gap-1">
+                  <input
+                    aria-label="Имя поставщика"
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                    placeholder="Имя поставщика"
+                    className="rounded border border-stone-300 px-2 py-1"
+                  />
+                  <button type="button" onClick={() => void addSupplier()} className="rounded border border-stone-700 px-2 py-1 text-stone-700">Создать</button>
+                  <button type="button" onClick={() => { setCreatingSupplier(false); setNewSupplierName(""); }} className="text-stone-500">Отмена</button>
+                </span>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-stone-600">Тип</span>
