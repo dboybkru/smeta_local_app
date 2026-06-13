@@ -52,10 +52,12 @@ export default function ModelsSection({ version, onChanged }: Props) {
     }
   }
 
+  const LIMIT = 50;
   const q = query.trim().toLowerCase();
-  const visible = q
+  const matched = q
     ? models.filter((m) => `${m.model_id} ${m.label}`.toLowerCase().includes(q))
-    : [];
+    : models;
+  const visible = matched.slice(0, LIMIT);
 
   return (
     <section className="mb-10">
@@ -86,9 +88,7 @@ export default function ModelsSection({ version, onChanged }: Props) {
 
       {models.length === 0 ? (
         <p className="text-stone-500">Моделей нет — добавьте провайдера и нажмите «Импорт моделей».</p>
-      ) : !q ? (
-        <p className="text-stone-500">Введите название модели в поиск, чтобы найти и включить нужную.</p>
-      ) : visible.length === 0 ? (
+      ) : matched.length === 0 ? (
         <p className="text-stone-500">Ничего не найдено по запросу «{query}».</p>
       ) : (
         <table className="w-full border-collapse text-sm">
@@ -127,6 +127,11 @@ export default function ModelsSection({ version, onChanged }: Props) {
             ))}
           </tbody>
         </table>
+      )}
+      {matched.length > LIMIT && (
+        <p className="mt-2 text-xs text-stone-500">
+          Показаны первые {LIMIT} из {matched.length}. Уточните поиск, чтобы найти нужную модель.
+        </p>
       )}
     </section>
   );

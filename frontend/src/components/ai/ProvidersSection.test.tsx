@@ -46,4 +46,24 @@ describe("ProvidersSection", () => {
     await userEvent.click(screen.getByText("Импорт моделей"));
     expect(await screen.findByText(/Импортировано моделей: 5/)).toBeInTheDocument();
   });
+
+  it("edits a provider's base_url and auth_style (PUT)", async () => {
+    const f = vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "PUT") return json({ ...P, base_url: "https://new/v1", auth_style: "bearer" });
+      return json([P]);
+    });
+    vi.stubGlobal("fetch", f);
+    render(<ProvidersSection version={0} onChanged={() => {}} />);
+    await userEvent.click(await screen.findByText("Изменить"));
+    const base = screen.getByLabelText("Base URL VseGPT");
+    await userEvent.clear(base);
+    await userEvent.type(base, "https://new/v1");
+    await userEvent.selectOptions(screen.getByLabelText("Авторизация VseGPT"), "bearer");
+    await userEvent.click(screen.getByText("Сохранить"));
+    const puts = f.mock.calls.filter((c) => (c[1] as RequestInit)?.method === "PUT");
+    expect(puts.length).toBe(1);
+    expect(JSON.parse((puts[0][1] as RequestInit).body as string)).toEqual({
+      base_url: "https://new/v1", auth_style: "bearer",
+    });
+  });
 });
