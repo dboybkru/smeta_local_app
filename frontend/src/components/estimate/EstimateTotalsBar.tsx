@@ -13,7 +13,7 @@ export default function EstimateTotalsBar({ totals, vatEnabled }: Props) {
         Работы <span>{fmtMoney(totals.works)}</span>
       </span>
       <span className="text-stone-600">
-        Без налога <span>{fmtMoney(totals.subtotal)}</span>
+        Без НДС <span>{fmtMoney(totals.subtotal)}</span>
       </span>
       {vatEnabled && (
         <span className="text-stone-600">

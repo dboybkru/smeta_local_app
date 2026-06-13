@@ -25,6 +25,7 @@ describe("EstimateTotalsBar", () => {
 
   it("hides VAT line when disabled", () => {
     render(<EstimateTotalsBar totals={T} vatEnabled={false} />);
-    expect(screen.queryByText(/НДС/)).not.toBeInTheDocument();
+    // строка НДС начинается с «НДС » — «Без НДС» (subtotal) сюда не попадает
+    expect(screen.queryByText(/^НДС /)).not.toBeInTheDocument();
   });
 });
