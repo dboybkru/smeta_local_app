@@ -3,6 +3,7 @@ import RequireAuth from "./components/RequireAuth";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import CatalogPage from "./pages/CatalogPage";
+import EstimateEditorPage from "./pages/EstimateEditorPage";
 import EstimatesListPage from "./pages/EstimatesListPage";
 import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/estimates" element={<EstimatesListPage />} />
+        <Route path="/estimates/:id" element={<EstimateEditorPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/price-levels" element={<PriceLevelsPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
