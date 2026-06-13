@@ -10,6 +10,7 @@ from app.core.db import Base, get_db
 from app.estimates import models as _estimate_models  # noqa: F401
 from app.profile import models as _profile_models  # noqa: F401
 from app.publiclinks import models as _publiclink_models  # noqa: F401
+from app.ai import models as _ai_models  # noqa: F401
 from app.main import app
 
 
