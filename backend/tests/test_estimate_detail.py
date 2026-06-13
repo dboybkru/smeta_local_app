@@ -95,3 +95,33 @@ def test_viewer_does_not_see_margin(client, db_session):
     body = client.get(f"/api/estimates/{eid}", headers=_hdr(viewer)).json()
     assert body["totals"]["margin"] is None
     assert body["branches"][0]["sections"][0]["lines"][0]["purchase_price_snapshot"] is None
+
+
+def test_detail_includes_proposal(client, db_session):
+    from app.auth.models import User
+    from app.core.security import create_access_token
+    from app.estimates.models import Estimate
+
+    u = User(email="p@x.ru", name="U", role="estimator", status="active")
+    db_session.add(u); db_session.commit()
+    est = Estimate(owner_id=u.id, object_name="Объект",
+                   proposal={"title": "КП", "advantages": ["a"]})
+    db_session.add(est); db_session.commit(); db_session.refresh(est)
+    hdr = {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
+    r = client.get(f"/api/estimates/{est.id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["proposal"] == {"title": "КП", "advantages": ["a"]}
+
+
+def test_detail_proposal_null_by_default(client, db_session):
+    from app.auth.models import User
+    from app.core.security import create_access_token
+    from app.estimates.models import Estimate
+
+    u = User(email="p2@x.ru", name="U", role="estimator", status="active")
+    db_session.add(u); db_session.commit()
+    est = Estimate(owner_id=u.id, object_name="Объект")
+    db_session.add(est); db_session.commit(); db_session.refresh(est)
+    hdr = {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
+    r = client.get(f"/api/estimates/{est.id}", headers=hdr)
+    assert r.json()["proposal"] is None

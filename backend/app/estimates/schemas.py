@@ -181,3 +181,4 @@ class EstimateDetail(BaseModel):
     vat_rate: Decimal
     branches: list[BranchDetail]
     totals: EstimateTotals | None = None
+    proposal: dict | None = None
