@@ -52,3 +52,47 @@ def test_create_foreign_404(client, db_session):
     est = _estimate(db_session, a)
     r = client.post(f"/api/estimates/{est.id}/public-links", json={}, headers=_hdr(b))
     assert r.status_code == 404
+
+
+# --- resolve_token (service-level, used by public router) ---
+import pytest  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
+from app.publiclinks import service as pl_service  # noqa: E402
+from app.publiclinks.models import PublicLink  # noqa: E402
+
+
+def _link(db_session, **kwargs):
+    u = _user(db_session, email="lnk@x.ru")
+    est = _estimate(db_session, u)
+    link = PublicLink(estimate_id=est.id, token=kwargs.pop("token", "tk"), **kwargs)
+    db_session.add(link)
+    db_session.commit()
+    return link
+
+
+def test_resolve_token_ok(db_session):
+    link = _link(db_session, token="tk-ok")
+    assert pl_service.resolve_token(db_session, "tk-ok").id == link.id
+
+
+def test_resolve_token_revoked_404(db_session):
+    _link(db_session, token="tk-rev", revoked=True)
+    with pytest.raises(HTTPException) as exc:
+        pl_service.resolve_token(db_session, "tk-rev")
+    assert exc.value.status_code == 404
+
+
+def test_resolve_token_missing_404(db_session):
+    with pytest.raises(HTTPException) as exc:
+        pl_service.resolve_token(db_session, "nope")
+    assert exc.value.status_code == 404
+
+
+def test_resolve_token_expired_410(db_session):
+    from datetime import UTC, datetime, timedelta
+
+    _link(db_session, token="tk-exp", expires_at=datetime.now(UTC) - timedelta(days=1))
+    with pytest.raises(HTTPException) as exc:
+        pl_service.resolve_token(db_session, "tk-exp")
+    assert exc.value.status_code == 410

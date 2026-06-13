@@ -23,7 +23,7 @@ def create_link(db: Session, estimate_id: int, body: schemas.PublicLinkIn) -> mo
     return link
 
 
-def list_links(db: Session, estimate_id: int):
+def list_links(db: Session, estimate_id: int) -> list[models.PublicLink]:
     return db.scalars(
         select(models.PublicLink)
         .where(models.PublicLink.estimate_id == estimate_id)
