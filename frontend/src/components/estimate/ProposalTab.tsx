@@ -5,6 +5,20 @@ import ProposalBlocksEditor from "./ProposalBlocksEditor";
 
 const EMPTY: ProposalBlocks = { title: "", subtitle: "", pain: "", solution: "", advantages: [], terms: "", cta: "" };
 
+// Защита от кривых данных (AI/частичный PATCH мог вернуть неполную форму) —
+// иначе .map по advantages роняет всю вкладку в белый экран.
+function normalize(b: Partial<ProposalBlocks> | null | undefined): ProposalBlocks {
+  return {
+    title: b?.title ?? "",
+    subtitle: b?.subtitle ?? "",
+    pain: b?.pain ?? "",
+    solution: b?.solution ?? "",
+    advantages: Array.isArray(b?.advantages) ? b!.advantages : [],
+    terms: b?.terms ?? "",
+    cta: b?.cta ?? "",
+  };
+}
+
 export default function ProposalTab({
   estimateId, initial, canEdit,
 }: {
@@ -12,7 +26,7 @@ export default function ProposalTab({
   initial: ProposalBlocks | null;
   canEdit: boolean;
 }) {
-  const [blocks, setBlocks] = useState<ProposalBlocks>(initial ?? EMPTY);
+  const [blocks, setBlocks] = useState<ProposalBlocks>(initial ? normalize(initial) : EMPTY);
   const [hasBlocks, setHasBlocks] = useState<boolean>(initial != null);
   const [rev, setRev] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -24,7 +38,7 @@ export default function ProposalTab({
     setBusy(true); setError(""); setNotConfigured(false);
     try {
       const out = await generateProposal(estimateId);
-      setBlocks(out); setHasBlocks(true); setRev((r) => r + 1);
+      setBlocks(normalize(out)); setHasBlocks(true); setRev((r) => r + 1);
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) setNotConfigured(true);
       else setError(e instanceof Error ? e.message : "Ошибка генерации");
@@ -37,7 +51,7 @@ export default function ProposalTab({
     if ((blocks[key] as string) === value) return;
     try {
       const out = await patchProposal(estimateId, { [key]: value });
-      setBlocks(out); setHasBlocks(true);
+      setBlocks(normalize(out)); setHasBlocks(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     }

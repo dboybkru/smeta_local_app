@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.ai import client, crypto, router_advisor, schemas, service
@@ -165,11 +165,17 @@ def delete_all_models(
         q = q.where(AIModel.provider_id == provider_id)
     ids = list(db.scalars(q).all())
     if ids:
-        for purpose in db.scalars(select(AIPurpose)).all():
-            if purpose.primary_model_id in ids:
-                purpose.primary_model_id = None
-            if purpose.fallback_model_id in ids:
-                purpose.fallback_model_id = None
+        # Core-UPDATE выполняется сразу (до DELETE) — иначе Postgres ловит FK-violation
+        db.execute(
+            update(AIPurpose)
+            .where(AIPurpose.primary_model_id.in_(ids))
+            .values(primary_model_id=None)
+        )
+        db.execute(
+            update(AIPurpose)
+            .where(AIPurpose.fallback_model_id.in_(ids))
+            .values(fallback_model_id=None)
+        )
         db.execute(delete(AIModel).where(AIModel.id.in_(ids)))
         db.commit()
     return {"deleted": len(ids)}
