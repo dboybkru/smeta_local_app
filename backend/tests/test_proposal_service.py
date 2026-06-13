@@ -1,5 +1,7 @@
 import pytest
 
+from app.ai import service as ai_service
+from app.ai.errors import AINotConfigured
 from app.auth.models import User
 from app.estimates.models import Estimate, EstimateBranch, EstimateLine, EstimateSection
 from app.profile.models import CompanyProfile
@@ -21,9 +23,8 @@ def _estimate_with_lines(db_session):
     db_session.add(est)
     db_session.commit()
     db_session.refresh(est)
-    profile = CompanyProfile(
-        user_id=u.id, org_name="ООО Ромашка", utp=["Гарантия 5 лет"], guarantee="5 лет"
-    )
+    profile = CompanyProfile(user_id=u.id, org_name="ООО Ромашка",
+                             utp=["Гарантия 5 лет"], guarantee="5 лет")
     db_session.add(profile)
     db_session.commit()
     return est, profile
@@ -40,24 +41,38 @@ def test_build_prompt_includes_object_lines_and_profile(db_session):
 
 def test_generate_proposal_writes_blocks(db_session, monkeypatch):
     est, profile = _estimate_with_lines(db_session)
-    monkeypatch.setattr(service.settings, "anthropic_api_key", "sk-test")
-    fake = {
-        "title": "Ремонт под ключ", "subtitle": "Качество и сроки",
-        "pain": "Долго и дорого", "solution": "Сделаем за 30 дней",
-        "advantages": ["Свои бригады"], "terms": "Аванс 30%", "cta": "Свяжитесь с нами",
-    }
-    monkeypatch.setattr(service, "_call_claude", lambda prompt: fake)
-    result = service.generate_proposal(est, profile)
+    fake = {"title": "Ремонт под ключ", "subtitle": "Качество",
+            "pain": "Долго", "solution": "За 30 дней",
+            "advantages": ["Свои бригады"], "terms": "Аванс 30%", "cta": "Звоните"}
+    monkeypatch.setattr(ai_service, "call_llm", lambda db, key, messages, **kw: fake)
+    result = service.generate_proposal(db_session, est, profile)
     assert result["title"] == "Ремонт под ключ"
     assert result["advantages"] == ["Свои бригады"]
-    # generate_proposal прогоняет ответ через ProposalBlocks — ровно 7 нормализованных блоков
     assert set(result.keys()) == {
         "title", "subtitle", "pain", "solution", "advantages", "terms", "cta"
     }
 
 
-def test_generate_proposal_raises_when_no_key(db_session, monkeypatch):
+def test_generate_proposal_uses_proposal_generation_purpose(db_session, monkeypatch):
     est, profile = _estimate_with_lines(db_session)
-    monkeypatch.setattr(service.settings, "anthropic_api_key", "")
-    with pytest.raises(service.ProposalAINotConfigured):
-        service.generate_proposal(est, profile)
+    seen = {}
+
+    def fake(db, key, messages, **kw):
+        seen["key"] = key
+        seen["json_schema"] = kw.get("json_schema")
+        return {"title": "T", "subtitle": "", "pain": "", "solution": "",
+                "advantages": [], "terms": "", "cta": ""}
+
+    monkeypatch.setattr(ai_service, "call_llm", fake)
+    service.generate_proposal(db_session, est, profile)
+    assert seen["key"] == "proposal_generation"
+    assert seen["json_schema"] is not None
+
+
+def test_generate_proposal_propagates_not_configured(db_session, monkeypatch):
+    est, profile = _estimate_with_lines(db_session)
+    def boom(*a, **k):
+        raise AINotConfigured("нет модели")
+    monkeypatch.setattr(ai_service, "call_llm", boom)
+    with pytest.raises(AINotConfigured):
+        service.generate_proposal(db_session, est, profile)

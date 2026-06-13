@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.ai.errors import AIError, AINotConfigured
 from app.auth.deps import require_active
 from app.auth.models import User
 from app.core.db import get_db
@@ -21,10 +22,10 @@ def generate(
     est_service.require_write(est, user)
     profile = profile_service.get_profile(db, user.id)
     try:
-        blocks = service.generate_proposal(est, profile)
-    except service.ProposalAINotConfigured:
+        blocks = service.generate_proposal(db, est, profile)
+    except AINotConfigured:
         raise HTTPException(status_code=503, detail="AI не настроен")
-    except service.ProposalAIError as exc:
+    except AIError as exc:
         raise HTTPException(status_code=502, detail=f"Ошибка AI: {exc}")
     est.proposal = blocks
     db.commit()
