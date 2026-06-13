@@ -43,6 +43,7 @@ def upgrade() -> None:
         sa.Column('enabled', sa.Boolean(), server_default=sa.text('true'), nullable=False),
         sa.ForeignKeyConstraint(['provider_id'], ['ai_providers.id']),
         sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('provider_id', 'model_id'),
     )
     op.create_table(
         'ai_purposes',
