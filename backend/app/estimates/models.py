@@ -5,6 +5,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+from app.core.types import JSONType
 
 
 class Client(Base):
@@ -33,6 +34,7 @@ class Estimate(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    proposal: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     branches: Mapped[list["EstimateBranch"]] = relationship(
         back_populates="estimate", cascade="all, delete-orphan"
