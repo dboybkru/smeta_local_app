@@ -133,7 +133,8 @@ export default function ProvidersSection({ version, onChanged }: Props) {
         <button onClick={() => void add()} className="rounded border border-stone-700 px-3 py-1 text-stone-700">Добавить</button>
       </div>
       <p className="mb-4 text-xs text-stone-500">
-        Примеры: AITunnel — https://api.aitunnel.ru/v1/ (Bearer); VseGPT — https://api.vsegpt.ru/v1 (X-Api-Key).
+        Примеры: AITunnel — https://api.aitunnel.ru/v1/ ; VseGPT — https://api.vsegpt.ru/v1 .
+        Оба OpenAI-совместимы — для /v1/chat обычно нужен <b>Bearer</b>. Если получаете 403 — переключите авторизацию на Bearer.
       </p>
 
       {providers.length === 0 ? (
