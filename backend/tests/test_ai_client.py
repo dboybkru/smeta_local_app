@@ -1,0 +1,76 @@
+import httpx
+import pytest
+
+from app.ai import client, crypto
+from app.ai.errors import AIError
+from app.ai.models import AIProvider
+
+
+def _provider(auth_style="bearer"):
+    return AIProvider(
+        name="p", base_url="https://api.example.com/v1",
+        auth_style=auth_style, api_key_encrypted=crypto.encrypt("sk-test-123"),
+        enabled=True,
+    )
+
+
+def test_chat_completion_bearer_header_and_parse():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["auth"] = request.headers.get("authorization")
+        captured["xapi"] = request.headers.get("x-api-key")
+        captured["path"] = request.url.path
+        import json as _j
+        captured["body"] = _j.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "hi there"}}]})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    out = client.chat_completion(_provider("bearer"), "gpt-x",
+                                 [{"role": "user", "content": "q"}],
+                                 max_tokens=100, json_mode=False, http=http)
+    assert out == "hi there"
+    assert captured["auth"] == "Bearer sk-test-123"
+    assert captured["xapi"] is None
+    assert captured["path"].endswith("/chat/completions")
+    assert captured["body"]["model"] == "gpt-x"
+    assert "response_format" not in captured["body"]
+
+
+def test_chat_completion_xapikey_and_json_mode():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["xapi"] = request.headers.get("x-api-key")
+        captured["auth"] = request.headers.get("authorization")
+        import json as _j
+        captured["body"] = _j.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    client.chat_completion(_provider("x_api_key"), "m",
+                           [{"role": "user", "content": "q"}],
+                           max_tokens=50, json_mode=True, http=http)
+    assert captured["xapi"] == "sk-test-123"
+    assert captured["auth"] is None
+    assert captured["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_chat_completion_http_error_raises_aierror():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(AIError):
+        client.chat_completion(_provider(), "m", [{"role": "user", "content": "q"}],
+                               max_tokens=10, json_mode=False, http=http)
+
+
+def test_list_models_parses_ids():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/models")
+        return httpx.Response(200, json={"data": [{"id": "gpt-x"}, {"id": "claude-y"}]})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    ids = client.list_models(_provider(), http=http)
+    assert ids == ["gpt-x", "claude-y"]
