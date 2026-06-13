@@ -64,6 +64,22 @@ describe("ModelsSection", () => {
     expect(posts.some((c) => String(c[0]).includes("/models/10/test"))).toBe(true);
   });
 
+  it("deletes all models (bulk DELETE) and calls onChanged", async () => {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "DELETE") return json({ deleted: 2 });
+      return route(url);
+    });
+    vi.stubGlobal("fetch", f);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onChanged = vi.fn();
+    render(<ModelsSection version={0} onChanged={onChanged} />);
+    await userEvent.click(await screen.findByText("Удалить все"));
+    expect(onChanged).toHaveBeenCalled();
+    const dels = f.mock.calls.filter((c) => (c[1] as RequestInit)?.method === "DELETE");
+    expect(dels.length).toBe(1);
+    expect(String(dels[0][0])).toMatch(/\/ai\/models$/);
+  });
+
   it("saves input price on blur for an enabled model (PUT)", async () => {
     const f = vi.fn(async (url: string, init?: RequestInit) => {
       if ((init?.method ?? "GET") === "PUT") return json({ ...ON, input_price: "10" });

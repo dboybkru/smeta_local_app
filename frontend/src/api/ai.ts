@@ -98,6 +98,10 @@ export function updateModel(id: number, patch: ModelPatch) {
 export function deleteModel(id: number) {
   return api<void>(`/ai/models/${id}`, { method: "DELETE" });
 }
+export function deleteAllModels(providerId?: number) {
+  const q = providerId != null ? `?provider_id=${providerId}` : "";
+  return api<{ deleted: number }>(`/ai/models${q}`, { method: "DELETE" });
+}
 export function listPurposes() {
   return api<Purpose[]>("/ai/purposes");
 }

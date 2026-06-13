@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  deleteModel, listModels, listProviders, testModel, updateModel,
+  deleteAllModels, deleteModel, listModels, listProviders, testModel, updateModel,
   type AiModel, type ModelPatch, type Provider,
 } from "../../api/ai";
 
@@ -58,6 +58,18 @@ export default function ModelsSection({ version, onChanged }: Props) {
     setQuery("");
   }
 
+  async function removeAll() {
+    const scope = filter === "" ? "ВСЕ модели" : "все модели этого провайдера";
+    if (!window.confirm(`Удалить ${scope}? Они снимутся со всех целей.`)) return;
+    setError("");
+    try {
+      await deleteAllModels(filter === "" ? undefined : filter);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка удаления");
+    }
+  }
+
   async function runTest(m: AiModel) {
     setTests((cur) => ({ ...cur, [m.id]: "..." }));
     try {
@@ -112,10 +124,17 @@ export default function ModelsSection({ version, onChanged }: Props) {
           )}
         </div>
       </div>
-      <p className="mb-4 text-xs text-stone-500">
-        Всего моделей: {models.length}. Найдите модель в поиске и нажмите, чтобы включить.
-        Цены и «сильные стороны» необязательны — советник узнаёт модель по названию.
-      </p>
+      <div className="mb-4 flex items-center gap-3">
+        <p className="text-xs text-stone-500">
+          Всего моделей: {models.length}. Найдите модель в поиске и нажмите, чтобы включить.
+          Цены и «сильные стороны» необязательны — советник узнаёт модель по названию.
+        </p>
+        {models.length > 0 && (
+          <button onClick={() => void removeAll()} className="shrink-0 rounded border border-red-700 px-2 py-1 text-xs text-red-700">
+            {filter === "" ? "Удалить все" : "Удалить все у провайдера"}
+          </button>
+        )}
+      </div>
 
       <h3 className="mb-2 text-sm font-medium text-stone-700">Включённые модели</h3>
       {enabledModels.length === 0 ? (

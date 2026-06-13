@@ -152,6 +152,29 @@ def update_model(
     return m
 
 
+@router.delete("/models", status_code=200)
+def delete_all_models(
+    provider_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """Массовое удаление моделей (опц. по провайдеру). Сначала обнуляет ссылки
+    целей на удаляемые модели, чтобы не нарушить внешний ключ."""
+    q = select(AIModel.id)
+    if provider_id is not None:
+        q = q.where(AIModel.provider_id == provider_id)
+    ids = list(db.scalars(q).all())
+    if ids:
+        for purpose in db.scalars(select(AIPurpose)).all():
+            if purpose.primary_model_id in ids:
+                purpose.primary_model_id = None
+            if purpose.fallback_model_id in ids:
+                purpose.fallback_model_id = None
+        db.execute(delete(AIModel).where(AIModel.id.in_(ids)))
+        db.commit()
+    return {"deleted": len(ids)}
+
+
 @router.delete("/models/{model_id}", status_code=204)
 def delete_model(
     model_id: int,

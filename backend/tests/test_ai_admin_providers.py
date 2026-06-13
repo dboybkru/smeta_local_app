@@ -131,6 +131,31 @@ def test_model_smoke_test_endpoint(client_app, db_session, monkeypatch):
     assert "403" in bad.json()["detail"]
 
 
+def test_delete_all_models_clears_purpose_refs(client_app, db_session, monkeypatch):
+    from app.ai.models import AIPurpose
+    a = _admin(db_session)
+    db_session.add(AIPurpose(key="proposal_generation", title="КП"))
+    db_session.commit()
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
+        "api_key": "k"}).json()["id"]
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None},
+        {"id": "gpt-y", "input_price": None, "output_price": None}])
+    client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    mid = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]["id"]
+    # назначить модель на цель, чтобы проверить обнуление ссылки
+    client_app.put("/api/ai/purposes/proposal_generation", headers=_hdr(a),
+                   json={"primary_model_id": mid})
+    r = client_app.request("DELETE", "/api/ai/models", headers=_hdr(a))
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 2}
+    assert client_app.get("/api/ai/models", headers=_hdr(a)).json() == []
+    purpose = next(p for p in client_app.get("/api/ai/purposes", headers=_hdr(a)).json()
+                   if p["key"] == "proposal_generation")
+    assert purpose["primary_model_id"] is None
+
+
 def test_usage_summary_and_clear(client_app, db_session, monkeypatch):
     a = _admin(db_session)
     pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
