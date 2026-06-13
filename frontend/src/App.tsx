@@ -9,6 +9,7 @@ import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
 import LoginPage from "./pages/LoginPage";
 import PriceLevelsPage from "./pages/PriceLevelsPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/import" element={<ImportPage />} />
         <Route path="/price-levels" element={<PriceLevelsPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
     </Routes>
   );
