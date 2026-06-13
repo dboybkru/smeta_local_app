@@ -88,7 +88,13 @@ export default function SectionTable({
                 </td>
                 <td className="text-right tabular-nums text-stone-500">{fmtMoney(price)}</td>
                 <td className="text-right tabular-nums">{fmtMoney(lineSum(l))}</td>
-                {showMargin && <td />}
+                {showMargin && (
+                  <td className="text-right tabular-nums text-green-700">
+                    {l.purchase_price_snapshot != null
+                      ? fmtMoney((((Number(l.work_price) + Number(l.material_price)) - Number(l.purchase_price_snapshot)) * Number(l.qty)).toString())
+                      : "—"}
+                  </td>
+                )}
                 {canEdit && (
                   <td className="text-right">
                     <button onClick={() => onDeleteLine(l.id)} className="text-red-700">×</button>

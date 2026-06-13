@@ -10,7 +10,7 @@ const SECTION = {
     { id: 11, section_id: 5, item_id: 7, name: "Камера", unit: "шт", qty: "4.000", work_price: "0.00", material_price: "11000.00", sort_order: 0, purchase_price_snapshot: "7000.00" },
   ],
 } as SectionDetail;
-const TOTALS = { section_id: 5, materials: "44000.00", works: "0.00", total: "44000.00", purchase: "28000.00", margin: "16000.00" } as SectionTotals;
+const TOTALS = { section_id: 5, materials: "44000.00", works: "0.00", total: "44000.00", purchase: "28000.00", margin: "18000.00" } as SectionTotals;
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -25,7 +25,8 @@ describe("SectionTable", () => {
     );
     expect(screen.getByDisplayValue("Оборудование")).toBeInTheDocument();
     expect(screen.getByText("Камера")).toBeInTheDocument();
-    expect(screen.getByText("16 000,00")).toBeInTheDocument(); // section margin (ru-RU)
+    expect(screen.getByText("16 000,00")).toBeInTheDocument(); // per-line margin: (11000 - 7000) * 4 = 16000
+    expect(screen.getByText("18 000,00")).toBeInTheDocument(); // section margin in footer (ru-RU)
   });
 
   it("calls onPatchLine when qty edited", async () => {
