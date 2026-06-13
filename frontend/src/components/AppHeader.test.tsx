@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import * as authModule from "../auth/AuthContext";
@@ -13,7 +13,7 @@ function stubUser(role: string) {
   });
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("AppHeader", () => {
   it("shows the catalog link to any user", () => {
@@ -35,5 +35,16 @@ describe("AppHeader", () => {
     expect(screen.getByText("Импорт")).toBeInTheDocument();
     expect(screen.getByText("Уровни цен")).toBeInTheDocument();
     expect(screen.getByText("Пользователи")).toBeInTheDocument();
+  });
+
+  it("shows Реквизиты to estimator/admin but hides from viewer", () => {
+    stubUser("estimator");
+    const { unmount } = render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.getByText("Реквизиты")).toBeInTheDocument();
+    unmount();
+    vi.restoreAllMocks();
+    stubUser("viewer");
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.queryByText("Реквизиты")).not.toBeInTheDocument();
   });
 });
