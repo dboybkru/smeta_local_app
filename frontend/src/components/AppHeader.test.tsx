@@ -27,6 +27,7 @@ describe("AppHeader", () => {
     render(<MemoryRouter><AppHeader /></MemoryRouter>);
     expect(screen.queryByText("Импорт")).not.toBeInTheDocument();
     expect(screen.queryByText("Уровни цен")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI")).not.toBeInTheDocument();
   });
 
   it("shows admin-only links to admins", () => {
@@ -35,6 +36,7 @@ describe("AppHeader", () => {
     expect(screen.getByText("Импорт")).toBeInTheDocument();
     expect(screen.getByText("Уровни цен")).toBeInTheDocument();
     expect(screen.getByText("Пользователи")).toBeInTheDocument();
+    expect(screen.getByText("AI")).toBeInTheDocument();
   });
 
   it("shows Реквизиты to estimator/admin but hides from viewer", () => {

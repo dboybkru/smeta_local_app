@@ -24,6 +24,9 @@ export default function AppHeader() {
           <Link to="/admin/suppliers" className="text-stone-600 hover:text-stone-900">Поставщики</Link>
         )}
         {isAdmin && (
+          <Link to="/admin/ai" className="text-stone-600 hover:text-stone-900">AI</Link>
+        )}
+        {isAdmin && (
           <Link to="/admin/users" className="text-stone-600 hover:text-stone-900">Пользователи</Link>
         )}
         <span className="text-stone-400">{user?.email}</span>

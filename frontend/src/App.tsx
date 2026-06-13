@@ -10,6 +10,7 @@ import ImportPage from "./pages/ImportPage";
 import LoginPage from "./pages/LoginPage";
 import PriceLevelsPage from "./pages/PriceLevelsPage";
 import ProfilePage from "./pages/ProfilePage";
+import AiConfigPage from "./pages/AiConfigPage";
 import SuppliersPage from "./pages/SuppliersPage";
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/import" element={<ImportPage />} />
         <Route path="/price-levels" element={<PriceLevelsPage />} />
         <Route path="/admin/suppliers" element={<SuppliersPage />} />
+        <Route path="/admin/ai" element={<AiConfigPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
