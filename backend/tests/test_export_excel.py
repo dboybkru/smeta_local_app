@@ -42,6 +42,12 @@ def test_private_context_keeps_margin(db_session):
     est = _estimate(db_session)
     context = ctx.build_export_context(est, level="full", public=False)
     assert context["totals"]["margin"] is not None
+    # симметрично public-тесту: в приватном выводе маржа и закупка ПРИСУТСТВУЮТ на всех уровнях
+    assert context["totals"]["purchase"] is not None
+    for section in context["sections"]:
+        assert section["totals"]["margin"] is not None
+        for line in section["lines"]:
+            assert "purchase_price_snapshot" in line
 
 
 def test_render_xlsx_is_valid_workbook(db_session):
