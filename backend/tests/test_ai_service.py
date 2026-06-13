@@ -40,6 +40,17 @@ def test_call_llm_json_parses_dict(db_session, monkeypatch):
     assert out == {"title": "T"}
 
 
+def test_call_llm_json_invalid_raises_aierror(db_session, monkeypatch):
+    # модель в json-режиме вернула невалидный JSON → AIError (после исчерпания кандидатов)
+    _setup(db_session)
+    monkeypatch.setattr(client, "chat_completion",
+                        lambda *a, **kw: "конечно, вот JSON: {...}")
+    with pytest.raises(AIError):
+        service.call_llm(db_session, "proposal_generation",
+                         [{"role": "user", "content": "hi"}],
+                         json_schema={"type": "object"})
+
+
 def test_call_llm_fallback_on_primary_error(db_session, monkeypatch):
     _setup(db_session, with_fallback=True)
 
