@@ -118,7 +118,8 @@ def test_model_smoke_test_endpoint(client_app, db_session, monkeypatch):
     client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
     mid = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]["id"]
 
-    monkeypatch.setattr(client, "chat_completion", lambda *args, **kw: "pong")
+    monkeypatch.setattr(client, "chat_completion", lambda *args, **kw: {
+        "content": "pong", "prompt_tokens": 1, "completion_tokens": 1, "cost_rub": None})
     ok = client_app.post(f"/api/ai/models/{mid}/test", headers=_hdr(a))
     assert ok.json() == {"ok": True, "detail": ""}
 
@@ -128,6 +129,30 @@ def test_model_smoke_test_endpoint(client_app, db_session, monkeypatch):
     bad = client_app.post(f"/api/ai/models/{mid}/test", headers=_hdr(a))
     assert bad.json()["ok"] is False
     assert "403" in bad.json()["detail"]
+
+
+def test_usage_summary_and_clear(client_app, db_session, monkeypatch):
+    a = _admin(db_session)
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://x/v1", "auth_style": "bearer",
+        "api_key": "k"}).json()["id"]
+    monkeypatch.setattr(client, "list_models", lambda prov, **kw: [
+        {"id": "gpt-x", "input_price": None, "output_price": None}])
+    client_app.post(f"/api/ai/providers/{pid}/models/refresh", headers=_hdr(a))
+    mid = client_app.get(f"/api/ai/models?provider_id={pid}", headers=_hdr(a)).json()[0]["id"]
+    monkeypatch.setattr(client, "chat_completion", lambda *args, **kw: {
+        "content": "pong", "prompt_tokens": 3, "completion_tokens": 4, "cost_rub": "0.01"})
+    client_app.post(f"/api/ai/models/{mid}/test", headers=_hdr(a))
+
+    body = client_app.get("/api/ai/usage", headers=_hdr(a)).json()
+    assert body["total_calls"] == 1
+    assert body["by_model"][0]["model_id"] == "gpt-x"
+    assert body["by_model"][0]["calls"] == 1
+    assert body["by_model"][0]["prompt_tokens"] == 3
+    assert body["total_cost_rub"] == "0.010000"
+
+    assert client_app.delete("/api/ai/usage", headers=_hdr(a)).status_code == 204
+    assert client_app.get("/api/ai/usage", headers=_hdr(a)).json()["total_calls"] == 0
 
 
 def test_update_model_price(client_app, db_session, monkeypatch):

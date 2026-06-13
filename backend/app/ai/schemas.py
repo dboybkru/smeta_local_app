@@ -79,3 +79,19 @@ class Recommendation(BaseModel):
     provider: str
     model_id: str
     rationale: str
+
+
+# --- usage / costs ---
+class UsageRow(BaseModel):
+    provider_name: str
+    model_id: str
+    calls: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost_rub: Decimal | None
+
+
+class UsageSummary(BaseModel):
+    total_calls: int
+    total_cost_rub: Decimal | None
+    by_model: list[UsageRow]

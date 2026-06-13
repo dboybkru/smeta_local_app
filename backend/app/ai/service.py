@@ -5,7 +5,22 @@ from sqlalchemy.orm import Session
 
 from app.ai import client
 from app.ai.errors import AIError, AINotConfigured
-from app.ai.models import AIModel, AIProvider, AIPurpose
+from app.ai.models import AIModel, AIProvider, AIPurpose, AIUsage
+
+
+def record_usage(
+    db: Session, provider: AIProvider, model: AIModel, purpose: str, result: dict
+) -> None:
+    """Записать фактический расход AI-вызова в журнал ai_usage."""
+    db.add(AIUsage(
+        provider_name=provider.name,
+        model_id=model.model_id,
+        purpose=purpose,
+        prompt_tokens=result.get("prompt_tokens", 0),
+        completion_tokens=result.get("completion_tokens", 0),
+        cost_rub=result.get("cost_rub"),
+    ))
+    db.commit()
 
 
 def _resolve(db: Session, model_id: int | None) -> tuple[AIProvider, AIModel] | None:
@@ -55,12 +70,12 @@ def call_llm(
     last_err: Exception | None = None
     for provider, model in candidates:
         try:
-            content = client.chat_completion(
+            result = client.chat_completion(
                 provider, model.model_id, sent, max_tokens=max_tokens, json_mode=json_mode
             )
-            if json_mode:
-                return json.loads(content)
-            return content
+            record_usage(db, provider, model, purpose_key, result)
+            content = result["content"]
+            return json.loads(content) if json_mode else content
         except (AIError, json.JSONDecodeError) as exc:
             last_err = exc
             continue

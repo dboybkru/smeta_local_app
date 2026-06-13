@@ -113,3 +113,23 @@ export function testPurpose(key: string) {
 export function testModel(id: number) {
   return api<{ ok: boolean; detail: string }>(`/ai/models/${id}/test`, { method: "POST" });
 }
+
+export type UsageRow = {
+  provider_name: string;
+  model_id: string;
+  calls: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_rub: string | null;
+};
+export type UsageSummary = {
+  total_calls: number;
+  total_cost_rub: string | null;
+  by_model: UsageRow[];
+};
+export function getUsage() {
+  return api<UsageSummary>("/ai/usage");
+}
+export function clearUsage() {
+  return api<void>("/ai/usage", { method: "DELETE" });
+}

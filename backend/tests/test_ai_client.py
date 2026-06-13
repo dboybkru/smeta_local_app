@@ -29,12 +29,30 @@ def test_chat_completion_bearer_header_and_parse():
     out = client.chat_completion(_provider("bearer"), "gpt-x",
                                  [{"role": "user", "content": "q"}],
                                  max_tokens=100, json_mode=False, http=http)
-    assert out == "hi there"
+    assert out["content"] == "hi there"
     assert captured["auth"] == "Bearer sk-test-123"
     assert captured["xapi"] is None
     assert captured["path"].endswith("/chat/completions")
     assert captured["body"]["model"] == "gpt-x"
     assert "response_format" not in captured["body"]
+
+
+def test_chat_completion_parses_usage_and_cost():
+    from decimal import Decimal
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {"prompt_tokens": 12, "completion_tokens": 8},
+            "cost_rub": "0.034",
+        })
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    out = client.chat_completion(_provider(), "m", [{"role": "user", "content": "q"}], http=http)
+    assert out["content"] == "ok"
+    assert out["prompt_tokens"] == 12
+    assert out["completion_tokens"] == 8
+    assert out["cost_rub"] == Decimal("0.034")
 
 
 def test_chat_completion_xapikey_and_json_mode():

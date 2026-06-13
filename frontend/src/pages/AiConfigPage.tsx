@@ -3,6 +3,7 @@ import AppHeader from "../components/AppHeader";
 import ProvidersSection from "../components/ai/ProvidersSection";
 import ModelsSection from "../components/ai/ModelsSection";
 import PurposesSection from "../components/ai/PurposesSection";
+import UsageSection from "../components/ai/UsageSection";
 
 export default function AiConfigPage() {
   const [version, setVersion] = useState(0);
@@ -15,6 +16,7 @@ export default function AiConfigPage() {
         <ProvidersSection version={version} onChanged={bump} />
         <ModelsSection version={version} onChanged={bump} />
         <PurposesSection version={version} onChanged={bump} />
+        <UsageSection version={version} onChanged={bump} />
       </main>
     </div>
   );

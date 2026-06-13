@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.ai import client, crypto, router_advisor, schemas, service
 from app.ai.errors import AIError, AINotConfigured
-from app.ai.models import AIModel, AIProvider, AIPurpose
+from app.ai.models import AIModel, AIProvider, AIPurpose, AIUsage
 from app.auth.deps import require_admin
 from app.auth.models import User
 from app.core.db import get_db
@@ -234,10 +234,47 @@ def test_model(
     if p is None:
         raise HTTPException(status_code=404, detail="Провайдер не найден")
     try:
-        client.chat_completion(
+        result = client.chat_completion(
             p, m.model_id, [{"role": "user", "content": "ping"}],
             max_tokens=_SMOKE_MAX_TOKENS,
         )
+        service.record_usage(db, p, m, "test", result)
         return {"ok": True, "detail": ""}
     except AIError as exc:
         return {"ok": False, "detail": str(exc)}
+
+
+# --- usage / costs ---
+@router.get("/usage", response_model=schemas.UsageSummary)
+def usage_summary(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    rows = db.execute(
+        select(
+            AIUsage.provider_name,
+            AIUsage.model_id,
+            func.count(AIUsage.id),
+            func.coalesce(func.sum(AIUsage.prompt_tokens), 0),
+            func.coalesce(func.sum(AIUsage.completion_tokens), 0),
+            func.sum(AIUsage.cost_rub),
+        )
+        .group_by(AIUsage.provider_name, AIUsage.model_id)
+        .order_by(func.count(AIUsage.id).desc())
+    ).all()
+    by_model = [
+        schemas.UsageRow(
+            provider_name=r[0], model_id=r[1], calls=r[2],
+            prompt_tokens=r[3], completion_tokens=r[4], cost_rub=r[5],
+        )
+        for r in rows
+    ]
+    total_calls = sum(r.calls for r in by_model)
+    costs = [r.cost_rub for r in by_model if r.cost_rub is not None]
+    total_cost = sum(costs) if costs else None
+    return schemas.UsageSummary(
+        total_calls=total_calls, total_cost_rub=total_cost, by_model=by_model
+    )
+
+
+@router.delete("/usage", status_code=204)
+def clear_usage(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    db.execute(delete(AIUsage))
+    db.commit()

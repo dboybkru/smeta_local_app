@@ -44,6 +44,19 @@ def _base(provider: AIProvider) -> str:
     return provider.base_url.rstrip("/")
 
 
+def _extract_cost(data: dict, usage: dict) -> Decimal | None:
+    """Фактическая стоимость запроса в рублях (best-effort). AITunnel: cost_rub;
+    другие могут класть её в usage.cost_rub/usage.cost. Если нет — None."""
+    for raw in (data.get("cost_rub"), usage.get("cost_rub"), usage.get("cost")):
+        if raw is None:
+            continue
+        try:
+            return Decimal(str(raw))
+        except (InvalidOperation, ValueError, TypeError):
+            continue
+    return None
+
+
 def chat_completion(
     provider: AIProvider,
     model_id: str,
@@ -52,8 +65,11 @@ def chat_completion(
     max_tokens: int = 2000,
     json_mode: bool = False,
     http: httpx.Client | None = None,
-) -> str:
-    """POST /chat/completions к OpenAI-совместимому провайдеру. http — DI для тестов."""
+) -> dict:
+    """POST /chat/completions к OpenAI-совместимому провайдеру. http — DI для тестов.
+
+    Возвращает {"content": str, "prompt_tokens": int, "completion_tokens": int,
+    "cost_rub": Decimal|None}."""
     body: dict = {"model": model_id, "messages": messages, "max_tokens": max_tokens}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
@@ -68,7 +84,13 @@ def chat_completion(
         )
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        usage = data.get("usage") or {}
+        return {
+            "content": data["choices"][0]["message"]["content"],
+            "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+            "completion_tokens": int(usage.get("completion_tokens") or 0),
+            "cost_rub": _extract_cost(data, usage),
+        }
     except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
         raise AIError(f"{provider.name}: {exc}") from exc
     finally:

@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     Text,
@@ -60,3 +61,21 @@ class AIPurpose(Base):
         ForeignKey("ai_models.id"), nullable=True
     )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AIUsage(Base):
+    """Журнал AI-вызовов: фактический расход (токены/стоимость) для контроля затрат.
+    Провайдер/модель хранятся строками — история не зависит от жизни провайдера."""
+
+    __tablename__ = "ai_usage"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_name: Mapped[str] = mapped_column(String(50), default="")
+    model_id: Mapped[str] = mapped_column(String(200), default="")
+    purpose: Mapped[str] = mapped_column(String(50), default="")
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_rub: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

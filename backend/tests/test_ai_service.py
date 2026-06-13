@@ -1,10 +1,22 @@
 import json
+from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.ai import client, crypto, service
 from app.ai.errors import AIError, AINotConfigured
-from app.ai.models import AIModel, AIProvider, AIPurpose
+from app.ai.models import AIModel, AIProvider, AIPurpose, AIUsage
+
+
+def _r(content, **kw):
+    """Ответ chat_completion в новом формате (content + usage)."""
+    return {
+        "content": content,
+        "prompt_tokens": kw.get("prompt_tokens", 5),
+        "completion_tokens": kw.get("completion_tokens", 7),
+        "cost_rub": kw.get("cost_rub"),
+    }
 
 
 def _setup(db_session, *, with_fallback=False, provider_enabled=True):
@@ -24,16 +36,31 @@ def _setup(db_session, *, with_fallback=False, provider_enabled=True):
 def test_call_llm_returns_text(db_session, monkeypatch):
     _setup(db_session)
     monkeypatch.setattr(client, "chat_completion",
-                        lambda prov, mid, msgs, **kw: f"answer from {mid}")
+                        lambda prov, mid, msgs, **kw: _r(f"answer from {mid}"))
     out = service.call_llm(db_session, "proposal_generation",
                            [{"role": "user", "content": "hi"}])
     assert out == "answer from primary"
 
 
+def test_call_llm_records_usage(db_session, monkeypatch):
+    _setup(db_session)
+    monkeypatch.setattr(client, "chat_completion",
+                        lambda prov, mid, msgs, **kw: _r("ok", prompt_tokens=10,
+                                                         completion_tokens=20, cost_rub=Decimal("0.5")))
+    service.call_llm(db_session, "proposal_generation", [{"role": "user", "content": "hi"}])
+    rows = db_session.scalars(select(AIUsage)).all()
+    assert len(rows) == 1
+    assert rows[0].purpose == "proposal_generation"
+    assert rows[0].model_id == "primary"
+    assert rows[0].prompt_tokens == 10
+    assert rows[0].completion_tokens == 20
+    assert rows[0].cost_rub == Decimal("0.5")
+
+
 def test_call_llm_json_parses_dict(db_session, monkeypatch):
     _setup(db_session)
     monkeypatch.setattr(client, "chat_completion",
-                        lambda prov, mid, msgs, **kw: json.dumps({"title": "T"}))
+                        lambda prov, mid, msgs, **kw: _r(json.dumps({"title": "T"})))
     out = service.call_llm(db_session, "proposal_generation",
                            [{"role": "user", "content": "hi"}],
                            json_schema={"type": "object"})
@@ -44,7 +71,7 @@ def test_call_llm_json_invalid_raises_aierror(db_session, monkeypatch):
     # модель в json-режиме вернула невалидный JSON → AIError (после исчерпания кандидатов)
     _setup(db_session)
     monkeypatch.setattr(client, "chat_completion",
-                        lambda *a, **kw: "конечно, вот JSON: {...}")
+                        lambda *a, **kw: _r("конечно, вот JSON: {...}"))
     with pytest.raises(AIError):
         service.call_llm(db_session, "proposal_generation",
                          [{"role": "user", "content": "hi"}],
@@ -57,7 +84,7 @@ def test_call_llm_fallback_on_primary_error(db_session, monkeypatch):
     def fake(prov, mid, msgs, **kw):
         if mid == "primary":
             raise AIError("primary down")
-        return "from fallback"
+        return _r("from fallback")
 
     monkeypatch.setattr(client, "chat_completion", fake)
     out = service.call_llm(db_session, "proposal_generation",
