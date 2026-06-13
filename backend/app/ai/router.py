@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai import client, crypto, schemas
+from app.ai import client, crypto, router_advisor, schemas, service
+from app.ai.errors import AIError, AINotConfigured
 from app.ai.models import AIModel, AIProvider, AIPurpose
 from app.auth.deps import require_admin
 from app.auth.models import User
@@ -141,3 +142,51 @@ def delete_model(
         raise HTTPException(status_code=404, detail="Модель не найдена")
     db.delete(m)
     db.commit()
+
+
+# --- purposes ---
+@router.get("/purposes", response_model=list[schemas.PurposeOut])
+def list_purposes(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    return db.scalars(select(AIPurpose).order_by(AIPurpose.id)).all()
+
+
+@router.put("/purposes/{key}", response_model=schemas.PurposeOut)
+def update_purpose(
+    key: str,
+    body: schemas.PurposeUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    purpose = db.scalars(select(AIPurpose).where(AIPurpose.key == key)).first()
+    if purpose is None:
+        raise HTTPException(status_code=404, detail="Цель не найдена")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(purpose, field, value)
+    db.commit()
+    db.refresh(purpose)
+    return purpose
+
+
+# --- router advisor ---
+@router.post("/router/recommend", response_model=list[schemas.Recommendation])
+def router_recommend(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    try:
+        return router_advisor.recommend_models(db)
+    except AINotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except AIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# --- purpose smoke test ---
+@router.post("/purposes/{key}/test")
+def test_purpose(
+    key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    try:
+        service.call_llm(db, key, [{"role": "user", "content": "ping"}], max_tokens=16)
+        return {"ok": True, "detail": ""}
+    except (AINotConfigured, AIError) as exc:
+        return {"ok": False, "detail": str(exc)}
