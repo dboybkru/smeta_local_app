@@ -19,7 +19,9 @@ export default function EstimateEditorPage() {
   }, []);
 
   if (e.loading) return <Shell><p className="text-stone-500">Загрузка…</p></Shell>;
-  if (e.error || !e.estimate) {
+  // Полноэкранная ошибка — только если смета не загрузилась. Ошибки мутаций
+  // (e.error при загруженной смете) показываются внутренним alert, не стирая редактор.
+  if (!e.estimate) {
     return <Shell><p role="alert" className="text-red-600">{e.error || "Смета не найдена"}</p></Shell>;
   }
 
