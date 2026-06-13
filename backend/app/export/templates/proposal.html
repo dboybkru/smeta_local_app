@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: "DejaVu Serif", Georgia, serif; color: #1c1917; margin: 32px; }
+    h1, h2 { font-family: "DejaVu Serif", Georgia, serif; }
+    .subtitle { color: #57534e; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+    th, td { border-bottom: 1px solid #d6d3d1; padding: 6px 8px; text-align: left; }
+    td.num, th.num { text-align: right; }
+    .section-name td { font-weight: bold; background: #f5f5f4; }
+    .totals { margin-top: 16px; text-align: right; font-size: 13px; }
+    .totals .grand { font-size: 18px; font-weight: bold; }
+    .sign { margin-top: 48px; }
+    .watermark {
+      position: fixed; top: 40%; left: 10%; font-size: 80px; color: rgba(0,0,0,0.08);
+      transform: rotate(-30deg); z-index: -1;
+    }
+    .block { margin: 12px 0; }
+  </style>
+</head>
+<body>
+  {% if watermark %}<div class="watermark">{{ watermark }}</div>{% endif %}
+
+  {% if level in ("full", "cover") and proposal.title %}
+    <h1>{{ proposal.title }}</h1>
+    {% if proposal.subtitle %}<p class="subtitle">{{ proposal.subtitle }}</p>{% endif %}
+  {% else %}
+    <h1>Смета</h1>
+  {% endif %}
+  <p>Объект: {{ object_name }}</p>
+
+  {% if level == "full" %}
+    {% if proposal.pain %}<div class="block"><strong>Задача:</strong> {{ proposal.pain }}</div>{% endif %}
+    {% if proposal.solution %}<div class="block"><strong>Решение:</strong> {{ proposal.solution }}</div>{% endif %}
+    {% if proposal.advantages %}
+      <div class="block"><strong>Преимущества:</strong>
+        <ul>{% for a in proposal.advantages %}<li>{{ a }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <table>
+    <thead>
+      <tr>
+        <th>Наименование</th><th>Ед.</th><th class="num">Кол-во</th>
+        <th class="num">Материалы</th><th class="num">Работы</th><th class="num">Сумма</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for section in sections %}
+        <tr class="section-name"><td colspan="6">{{ section.name }}</td></tr>
+        {% for ln in section.lines %}
+          <tr>
+            <td>{{ ln.name }}</td><td>{{ ln.unit }}</td>
+            <td class="num">{{ ln.qty }}</td>
+            <td class="num">{{ ln.material_price }}</td>
+            <td class="num">{{ ln.work_price }}</td>
+            <td class="num">{{ section.totals.total }}</td>
+          </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div>Без НДС: {{ totals.subtotal }}</div>
+    {% if vat_enabled %}<div>НДС: {{ totals.vat }}</div>{% endif %}
+    <div class="grand">ВСЕГО: {{ totals.total }}</div>
+  </div>
+
+  {% if level == "full" and proposal.terms %}
+    <div class="block"><strong>Условия:</strong> {{ proposal.terms }}</div>
+  {% endif %}
+  {% if level in ("full", "cover") and proposal.cta %}
+    <div class="block">{{ proposal.cta }}</div>
+  {% endif %}
+
+  <div class="sign">Подпись: ____________________&nbsp;&nbsp;&nbsp;М.П.</div>
+</body>
+</html>
