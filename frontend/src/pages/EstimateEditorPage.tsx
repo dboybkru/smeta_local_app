@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import EstimateHeader from "../components/estimate/EstimateHeader";
+import EstimateTabs from "../components/estimate/EstimateTabs";
 import EstimateTotalsBar from "../components/estimate/EstimateTotalsBar";
+import ProposalTab from "../components/estimate/ProposalTab";
 import SectionTable from "../components/estimate/SectionTable";
+import ShareTab from "../components/estimate/ShareTab";
 import { listClients, createClient, type Client } from "../api/estimates";
 import { useEstimate } from "../hooks/useEstimate";
 
@@ -41,11 +44,8 @@ export default function EstimateEditorPage() {
     }
   }
 
-  return (
-    <Shell>
-      {e.error && <p role="alert" className="mb-3 text-red-600">{e.error}</p>}
-      <EstimateHeader key={est.id} estimate={est} clients={clients} canEdit={e.canEdit} onPatch={e.patchEstimate} onCreateClient={handleCreateClient} />
-
+  const smetaTab = (
+    <>
       {sections.map((s) => (
         <SectionTable
           key={s.id}
@@ -60,7 +60,6 @@ export default function EstimateEditorPage() {
           onDeleteSection={() => e.deleteSection(s.id)}
         />
       ))}
-
       {e.canEdit && (
         <div className="mb-6 flex items-center gap-2 text-sm">
           <input
@@ -77,8 +76,19 @@ export default function EstimateEditorPage() {
           </button>
         </div>
       )}
-
       <EstimateTotalsBar totals={totals} vatEnabled={est.vat_enabled} />
+    </>
+  );
+
+  return (
+    <Shell>
+      {e.error && <p role="alert" className="mb-3 text-red-600">{e.error}</p>}
+      <EstimateHeader key={est.id} estimate={est} clients={clients} canEdit={e.canEdit} onPatch={e.patchEstimate} onCreateClient={handleCreateClient} />
+      <EstimateTabs
+        smeta={smetaTab}
+        kp={<ProposalTab estimateId={est.id} initial={est.proposal} canEdit={e.canEdit} />}
+        share={<ShareTab estimateId={est.id} canEdit={e.canEdit} />}
+      />
     </Shell>
   );
 }
