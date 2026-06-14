@@ -18,6 +18,8 @@ class ParsedRow:
     unit: str = "шт"
     category: str = ""
     characteristics: str = ""
+    manufacturer: str = ""
+    price_on_request: bool = False
     prices: dict[int, Decimal] = field(default_factory=dict)
     problems: list[str] = field(default_factory=list)
 
@@ -45,45 +47,104 @@ def _parse_price(raw: str) -> Decimal:
     return Decimal(cleaned).quantize(Decimal("0.01"))
 
 
-def parse_rows(
-    rows: Rows,
-    header_row: int,
-    mapping: ColumnMapping,
-    default_category: str = "",
-) -> list[ParsedRow]:
-    header = rows[header_row] if header_row < len(rows) else []
-    header_name = _cell(header, mapping.name_col)
+ON_REQUEST_PHRASES = ("звоните", "по запросу", "уточняйте", "уточнить",
+                      "договорная", "запрос", "прайс")
+
+
+def _clean_unit(raw: str) -> str:
+    raw = raw.strip()
+    if not raw:
+        return "шт"
+    if "/" in raw:
+        raw = raw.rsplit("/", 1)[-1].strip()
+    return raw or "шт"
+
+
+def _is_on_request_text(raw: str) -> bool:
+    low = raw.strip().lower()
+    return any(p in low for p in ON_REQUEST_PHRASES)
+
+
+def _category_text(row: list, mapping: ColumnMapping) -> str:
+    """Текст строки-категории: имя, иначе производитель, иначе любая описательная."""
+    for col in (mapping.name_col, mapping.manufacturer_col, mapping.characteristics_col):
+        if col is not None:
+            t = _cell(row, col)
+            if t:
+                return t
+    for cell in row:
+        if cell is not None and str(cell).strip() and not str(cell).strip().isdigit():
+            return str(cell).strip()
+    return ""
+
+
+def parse_rows(rows: Rows, mapping: ColumnMapping, default_category: str = "") -> list[ParsedRow]:
+    data_start = mapping.data_start_row if mapping.data_start_row is not None \
+        else mapping.header_row + 1
+    on_request_cols = set(mapping.on_request_cols)
     parsed: list[ParsedRow] = []
-    for row in rows[header_row + 1 :]:
+    current_category = ""
+    for row in rows[data_start:]:
         name = _cell(row, mapping.name_col)
-        if not name:
-            continue
-        if name == header_name:  # повтор шапки посреди листа (реальные прайсы Optimus)
-            continue
-        item = ParsedRow(
-            name=name,
-            article=_cell(row, mapping.article_col),
-            unit=_cell(row, mapping.unit_col) or "шт",
-            category=_cell(row, mapping.category_col) or default_category,
-            characteristics=_cell(row, mapping.characteristics_col),
-        )
+        prices: dict[int, Decimal] = {}
+        on_request = False
+        price_problems: list[str] = []
         for level_id, col in mapping.price_cols.items():
             raw = _cell(row, col)
             if not raw:
                 continue
+            if col in on_request_cols or _is_on_request_text(raw):
+                prices[level_id] = Decimal("0.00")
+                on_request = True
+                continue
             try:
                 value = _parse_price(raw)
             except InvalidOperation:
-                item.problems.append(f"Цена не распознана: «{raw}» (колонка {col + 1})")
+                price_problems.append(f"Цена не распознана: «{raw}» (колонка {col + 1})")
                 continue
             if value < 0:
-                item.problems.append(f"Отрицательная цена: {value} (колонка {col + 1})")
+                price_problems.append(f"Отрицательная цена: {value} (колонка {col + 1})")
                 continue
-            item.prices[level_id] = value
-        if mapping.price_cols and not item.prices and not item.problems:
+            prices[level_id] = value
+
+        has_article = bool(_cell(row, mapping.article_col))
+        if not prices and not price_problems:
+            if not has_article:
+                # строка без артикула и без цен — категория или пустая
+                text = _category_text(row, mapping)
+                if text:
+                    current_category = text
+                continue
+            if not name:
+                continue
+            item = _build_row(row, mapping, name, current_category, default_category,
+                              prices, on_request)
             item.problems.append("Нет ни одной цены")
+            parsed.append(item)
+            continue
+
+        if not name:
+            continue
+        item = _build_row(row, mapping, name, current_category, default_category,
+                          prices, on_request)
+        item.problems.extend(price_problems)
         parsed.append(item)
     return parsed
+
+
+def _build_row(row, mapping, name, current_category, default_category, prices,
+               on_request) -> ParsedRow:
+    category = (current_category or _cell(row, mapping.category_col) or default_category)
+    return ParsedRow(
+        name=name,
+        article=_cell(row, mapping.article_col),
+        unit=_clean_unit(_cell(row, mapping.unit_col)),
+        category=category,
+        characteristics=_cell(row, mapping.characteristics_col),
+        manufacturer=_cell(row, mapping.manufacturer_col),
+        price_on_request=on_request,
+        prices=prices,
+    )
 
 
 def _latest_prices(db: Session, supplier_id: int) -> dict[tuple[int, int], Decimal]:
