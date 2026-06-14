@@ -142,6 +142,16 @@ def test_apply_changeset_set_qty_and_delete(db_session):
     assert len(sec.lines) == 0
 
 
+def test_candidates_include_characteristics(db_session):
+    from app.catalog.models import CatalogItem, Supplier
+    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
+    it = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material",
+                     characteristics={"Разрешение": "2 Мп"})
+    db_session.add(it); db_session.commit()
+    text, items = asvc._candidates(db_session, ["камера"])
+    assert "Разрешение" in text
+
+
 def test_apply_changeset_atomic_rollback_on_bad_ref(db_session):
     from app.estimates import models as em
     est, item = _estimate_with_catalog(db_session)

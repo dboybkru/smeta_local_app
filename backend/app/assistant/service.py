@@ -61,8 +61,15 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
     for it in items:
         work, material, _ = est_service.snapshot_line_values(db, it, None)
         price = work + material
-        rows.append(f"  {it.id} | {it.name} | {it.unit} | {it.kind} | цена {price}")
-    text = "КАНДИДАТЫ КАТАЛОГА (catalog_item_id | имя | ед | вид | цена):\n" + "\n".join(rows)
+        chars = ""
+        if it.characteristics:
+            pairs = ", ".join(f"{k}: {v}" for k, v in list(it.characteristics.items())[:6])
+            chars = f" | {pairs}"
+        rows.append(f"  {it.id} | {it.name} | {it.unit} | {it.kind} | цена {price}{chars}")
+    text = (
+        "КАНДИДАТЫ КАТАЛОГА (catalog_item_id | имя | ед | вид | цена | характеристики):\n"
+        + "\n".join(rows)
+    )
     return text, items
 
 
