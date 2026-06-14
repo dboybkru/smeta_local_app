@@ -2,9 +2,10 @@
 
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.catalog import search
 from app.catalog.models import CatalogItem, ItemPrice, PriceList
 
 # TODO(scale): при росте каталога заменить LIKE на tsvector+pg_trgm (спека §4)
@@ -23,12 +24,14 @@ def search_items(
     offset: int = 0,
 ) -> tuple[list[CatalogItem], int]:
     query = select(CatalogItem)
-    if q:
-        pattern = f"%{_escape_like(q.lower())}%"
-        query = query.where(
-            func.lower(CatalogItem.name).like(pattern, escape="\\")
-            | func.lower(CatalogItem.article).like(pattern, escape="\\")
-        )
+    for token in search.tokens(q):
+        # токен matches, если ЛЮБОЙ его раскладочный вариант — подстрока name/article
+        variant_clauses = []
+        for v in search.variants(token):
+            pat = f"%{_escape_like(v)}%"
+            variant_clauses.append(func.lower(CatalogItem.name).like(pat, escape="\\"))
+            variant_clauses.append(func.lower(CatalogItem.article).like(pat, escape="\\"))
+        query = query.where(or_(*variant_clauses))
     if supplier_id is not None:
         query = query.where(CatalogItem.supplier_id == supplier_id)
     if kind is not None:

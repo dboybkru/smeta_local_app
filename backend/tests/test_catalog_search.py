@@ -1,7 +1,44 @@
 import json
 
+from app.catalog import search
+from app.catalog.models import CatalogItem, Supplier
+from app.catalog.service import search_items
 from tests.catalog_files import make_bolid_xlsx
 from tests.test_price_levels import make_admin
+
+
+def _mk_item(db, name):
+    s = Supplier(name=f"S-{name}")
+    db.add(s)
+    db.commit()
+    it = CatalogItem(supplier_id=s.id, name=name, article="A", unit="шт", kind="material")
+    db.add(it)
+    db.commit()
+    return it
+
+
+def test_variants_swaps_layout():
+    assert "камера" in search.variants("rfvthf")  # EN-раскладка слова «камера»
+    assert "rfvthf" in search.variants("камера")
+
+
+def test_search_wrong_layout_finds(db_session):
+    _mk_item(db_session, "Видеокамера Optimus AHD")
+    items, total = search_items(db_session, q="rfvthf")
+    assert total == 1 and items[0].name == "Видеокамера Optimus AHD"
+
+
+def test_search_multiword_any_order(db_session):
+    _mk_item(db_session, "Видеокамера Optimus AHD")
+    a, _ = search_items(db_session, q="optimus камера")
+    b, _ = search_items(db_session, q="камера optimus")
+    assert len(a) == 1 and len(b) == 1
+
+
+def test_search_multiword_no_match(db_session):
+    _mk_item(db_session, "Кабель UTP")
+    items, total = search_items(db_session, q="камера optimus")
+    assert total == 0 and items == []
 
 
 def import_bolid(client, admin):
