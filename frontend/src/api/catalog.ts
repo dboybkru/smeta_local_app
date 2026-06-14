@@ -36,6 +36,7 @@ export type CatalogItem = {
   category: string;
   kind: string;
   prices: Record<string, string>; // level_id (string) -> decimal string
+  characteristics: Record<string, string> | null;
 };
 export type ItemsPage = { items: CatalogItem[]; total: number };
 
@@ -105,6 +106,15 @@ export const listItems = (f: ItemFilters = {}) => {
   if (f.limit != null) params.set("limit", String(f.limit));
   if (f.offset != null) params.set("offset", String(f.offset));
   return api<ItemsPage>(`/catalog/items?${params.toString()}`);
+};
+
+export const extractCharacteristics = (supplierId?: number, batch = 40) => {
+  const params = new URLSearchParams({ batch: String(batch) });
+  if (supplierId != null) params.set("supplier_id", String(supplierId));
+  return api<{ processed: number; remaining: number }>(
+    `/catalog/extract-characteristics?${params.toString()}`,
+    { method: "POST" },
+  );
 };
 
 export const listPriceLists = (supplier_id?: number) => {
