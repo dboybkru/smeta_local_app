@@ -3,6 +3,7 @@ import AppHeader from "../components/AppHeader";
 import ColumnMapper from "../components/ColumnMapper";
 import {
   createSupplier,
+  extractCharacteristics,
   importFile,
   inspectFile,
   listPriceLevels,
@@ -38,6 +39,7 @@ export default function ImportPage() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [extractMsg, setExtractMsg] = useState("");
 
   useEffect(() => {
     Promise.all([listSuppliers(), listPriceLevels()])
@@ -118,10 +120,30 @@ export default function ImportPage() {
       });
       setSummary(res);
       setStep("result");
+      void runExtract();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Импорт не удался");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function runExtract() {
+    if (supplierId === "") return;
+    setExtractMsg("✨ AI: извлекаю характеристики…");
+    try {
+      for (let i = 0; i < 200; i++) {
+        const r = await extractCharacteristics(supplierId);
+        if (r.remaining <= 0) {
+          setExtractMsg(r.processed > 0 || i > 0 ? "✓ Характеристики извлечены." : "");
+          return;
+        }
+        setExtractMsg(`✨ AI: извлекаю характеристики… осталось ${r.remaining}`);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503)
+        setExtractMsg("AI не настроен — характеристики пропущены (настройте цель «catalog_extract»).");
+      else setExtractMsg(err instanceof Error ? `Характеристики: ${err.message}` : "");
     }
   }
 
@@ -133,6 +155,7 @@ export default function ImportPage() {
     setMapping(EMPTY_MAPPING);
     setSummary(null);
     setError("");
+    setExtractMsg("");
   }
 
   return (
@@ -268,6 +291,7 @@ export default function ImportPage() {
         {step === "result" && summary && (
           <div className="space-y-4 text-sm">
             <h2 className="font-serif text-lg text-stone-900">Импорт завершён</h2>
+            {extractMsg && <p className="text-stone-600">{extractMsg}</p>}
             <ul className="space-y-1 text-stone-700">
               <li>Версия прайса: {summary.version}</li>
               <li>Создано: {summary.items_created}</li>
