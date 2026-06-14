@@ -22,6 +22,7 @@ def search_items(
     kind: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    facets: dict[str, str] | None = None,
 ) -> tuple[list[CatalogItem], int]:
     query = select(CatalogItem)
     for token in search.tokens(q):
@@ -32,6 +33,8 @@ def search_items(
             variant_clauses.append(func.lower(CatalogItem.name).like(pat, escape="\\"))
             variant_clauses.append(func.lower(CatalogItem.article).like(pat, escape="\\"))
         query = query.where(or_(*variant_clauses))
+    for key, value in (facets or {}).items():
+        query = query.where(CatalogItem.characteristics[key].as_string() == value)
     if supplier_id is not None:
         query = query.where(CatalogItem.supplier_id == supplier_id)
     if kind is not None:

@@ -1,6 +1,6 @@
 import json as json_lib
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -206,9 +206,17 @@ def list_items(
     kind: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    f: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
 ):
-    items, total = service.search_items(db, q, supplier_id, kind, min(limit, 200), offset)
+    facets = {}
+    for pair in f:
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            facets[k] = v
+    items, total = service.search_items(
+        db, q, supplier_id, kind, min(limit, 200), offset, facets=facets
+    )
     prices = service.latest_prices_for(db, [i.id for i in items])
     out = [
         ItemOut(
@@ -225,6 +233,25 @@ def list_items(
         for i in items
     ]
     return ItemsPageOut(items=out, total=total)
+
+
+@router.get("/catalog/facets", dependencies=[Depends(require_active)])
+def catalog_facets(
+    supplier_id: int | None = None, kind: str | None = None, db: Session = Depends(get_db),
+):
+    query = select(CatalogItem.characteristics).where(CatalogItem.characteristics.isnot(None))
+    if supplier_id is not None:
+        query = query.where(CatalogItem.supplier_id == supplier_id)
+    if kind is not None:
+        query = query.where(CatalogItem.kind == kind)
+    facets: dict[str, set] = {}
+    for (chars,) in db.execute(query.limit(2000)).all():
+        if not isinstance(chars, dict):
+            continue
+        for k, v in chars.items():
+            if v:
+                facets.setdefault(str(k), set()).add(str(v))
+    return {k: sorted(vs)[:50] for k, vs in list(facets.items())[:40]}
 
 
 @router.get(
