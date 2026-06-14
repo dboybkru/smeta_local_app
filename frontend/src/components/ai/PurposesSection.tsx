@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  listModels, listProviders, listPurposes, recommend, testPurpose, updatePurpose,
+  listModels, listProviders, listPurposes, manufacturer, recommend, testPurpose, updatePurpose,
   type AiModel, type Provider, type Purpose, type Recommendation,
 } from "../../api/ai";
 import { ApiError } from "../../api/client";
@@ -26,9 +26,21 @@ export default function PurposesSection({ version, onChanged }: Props) {
   useEffect(() => { void load(); }, [version]);
 
   const enabledModels = models.filter((m) => m.enabled);
-  function modelLabel(m: AiModel) {
-    const prov = providers.find((p) => p.id === m.provider_id)?.name ?? `#${m.provider_id}`;
-    return `${prov} / ${m.label}`;
+  function provName(id: number) {
+    return providers.find((p) => p.id === id)?.name ?? `#${id}`;
+  }
+  // optgroup'ы: провайдер / производитель
+  function groupedOptions() {
+    const groups: Record<string, AiModel[]> = {};
+    for (const m of enabledModels) {
+      const key = `${provName(m.provider_id)} / ${manufacturer(m.model_id)}`;
+      (groups[key] ??= []).push(m);
+    }
+    return Object.keys(groups).sort().map((label) => (
+      <optgroup key={label} label={label}>
+        {groups[label].map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+      </optgroup>
+    ));
   }
 
   async function setModel(p: Purpose, field: "primary_model_id" | "fallback_model_id", value: string) {
@@ -103,7 +115,7 @@ export default function PurposesSection({ version, onChanged }: Props) {
                     onChange={(e) => void setModel(p, "primary_model_id", e.target.value)}
                     className="rounded border border-stone-300 px-1 py-0.5">
                     <option value="">— нет —</option>
-                    {enabledModels.map((m) => <option key={m.id} value={m.id}>{modelLabel(m)}</option>)}
+                    {groupedOptions()}
                   </select>
                 </td>
                 <td>
@@ -111,7 +123,7 @@ export default function PurposesSection({ version, onChanged }: Props) {
                     onChange={(e) => void setModel(p, "fallback_model_id", e.target.value)}
                     className="rounded border border-stone-300 px-1 py-0.5">
                     <option value="">— нет —</option>
-                    {enabledModels.map((m) => <option key={m.id} value={m.id}>{modelLabel(m)}</option>)}
+                    {groupedOptions()}
                   </select>
                 </td>
                 <td><input type="checkbox" aria-label={`Включена ${p.key}`} checked={p.enabled} onChange={() => void toggleEnabled(p)} /></td>

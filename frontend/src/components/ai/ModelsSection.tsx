@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  deleteAllModels, deleteModel, listModels, listProviders, testModel, updateModel,
+  deleteAllModels, deleteModel, listModels, listProviders, manufacturer, testModel, updateModel,
   type AiModel, type ModelPatch, type Provider,
 } from "../../api/ai";
 
@@ -86,6 +86,59 @@ export default function ModelsSection({ version, onChanged }: Props) {
     : [];
   const enabledModels = models.filter((m) => m.enabled);
 
+  // группировка включённых: провайдер → производитель → модели (отсортировано)
+  function groupedEnabled(): [string, [string, AiModel[]][]][] {
+    const byProv: Record<string, Record<string, AiModel[]>> = {};
+    for (const m of enabledModels) {
+      const prov = providerName(m.provider_id);
+      const man = manufacturer(m.model_id);
+      ((byProv[prov] ??= {})[man] ??= []).push(m);
+    }
+    return Object.keys(byProv).sort().map((prov) => [
+      prov,
+      Object.keys(byProv[prov]).sort().map((man) => [man, byProv[prov][man]] as [string, AiModel[]]),
+    ]);
+  }
+
+  function renderRow(m: AiModel) {
+    return (
+      <tr key={m.id} className="border-b border-stone-100 align-top">
+        <td className="py-1 font-mono text-xs">{m.model_id}</td>
+        <td>
+          <input defaultValue={m.label} aria-label={`Название ${m.model_id}`}
+            onBlur={(e) => { if (e.target.value !== m.label) void save(m, { label: e.target.value }); }}
+            className="w-32 rounded border border-stone-300 px-1 py-0.5" />
+        </td>
+        <td>
+          <input defaultValue={m.input_price ?? ""} aria-label={`Вход ${m.model_id}`}
+            onBlur={(e) => { const v = e.target.value.trim() === "" ? null : e.target.value.trim(); if (v !== (m.input_price ?? null)) void save(m, { input_price: v }); }}
+            className="w-16 rounded border border-stone-300 px-1 py-0.5" />
+        </td>
+        <td>
+          <input defaultValue={m.output_price ?? ""} aria-label={`Выход ${m.model_id}`}
+            onBlur={(e) => { const v = e.target.value.trim() === "" ? null : e.target.value.trim(); if (v !== (m.output_price ?? null)) void save(m, { output_price: v }); }}
+            className="w-16 rounded border border-stone-300 px-1 py-0.5" />
+        </td>
+        <td>
+          <input defaultValue={m.strengths} aria-label={`Сильные стороны ${m.model_id}`}
+            onBlur={(e) => { if (e.target.value !== m.strengths) void save(m, { strengths: e.target.value }); }}
+            className="w-40 rounded border border-stone-300 px-1 py-0.5" />
+        </td>
+        <td><input type="checkbox" aria-label={`Включена ${m.model_id}`} checked={m.enabled} onChange={() => void save(m, { enabled: !m.enabled })} /></td>
+        <td className="space-x-2 whitespace-nowrap text-right">
+          <button onClick={() => void runTest(m)} className="rounded border border-stone-500 px-2 py-1 text-stone-600">Тест</button>
+          {tests[m.id] === "..." && <span className="text-stone-400">…</span>}
+          {tests[m.id] && tests[m.id] !== "..." && (
+            <span className={(tests[m.id] as { ok: boolean }).ok ? "text-green-700" : "text-red-600"}>
+              {(tests[m.id] as { ok: boolean; detail: string }).ok ? "✓" : `✗ ${(tests[m.id] as { ok: boolean; detail: string }).detail}`}
+            </span>
+          )}
+          <button onClick={() => void remove(m)} className="rounded border border-red-700 px-2 py-1 text-red-700">Удалить</button>
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <section className="mb-10">
       <h2 className="mb-3 font-serif text-lg text-stone-900">Модели</h2>
@@ -136,53 +189,29 @@ export default function ModelsSection({ version, onChanged }: Props) {
         )}
       </div>
 
-      <h3 className="mb-2 text-sm font-medium text-stone-700">Включённые модели</h3>
+      <h3 className="mb-2 text-sm font-medium text-stone-700">Включённые модели ({enabledModels.length})</h3>
       {enabledModels.length === 0 ? (
         <p className="text-stone-500">Нет включённых моделей — найдите нужную через поиск выше и нажмите, чтобы включить.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead><tr className="border-b border-stone-300 text-left text-stone-500">
-            <th className="py-2">Провайдер</th><th>ID модели</th><th>Название</th><th>Вход (пров.)</th><th>Выход (пров.)</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
-          <tbody>
-            {enabledModels.map((m) => (
-              <tr key={m.id} className="border-b border-stone-200 align-top">
-                <td className="py-2 text-stone-500">{providerName(m.provider_id)}</td>
-                <td className="font-mono text-xs">{m.model_id}</td>
-                <td>
-                  <input defaultValue={m.label} aria-label={`Название ${m.model_id}`}
-                    onBlur={(e) => { if (e.target.value !== m.label) void save(m, { label: e.target.value }); }}
-                    className="w-32 rounded border border-stone-300 px-1 py-0.5" />
-                </td>
-                <td>
-                  <input defaultValue={m.input_price ?? ""} aria-label={`Вход ${m.model_id}`}
-                    onBlur={(e) => { const v = e.target.value.trim() === "" ? null : e.target.value.trim(); if (v !== (m.input_price ?? null)) void save(m, { input_price: v }); }}
-                    className="w-20 rounded border border-stone-300 px-1 py-0.5" />
-                </td>
-                <td>
-                  <input defaultValue={m.output_price ?? ""} aria-label={`Выход ${m.model_id}`}
-                    onBlur={(e) => { const v = e.target.value.trim() === "" ? null : e.target.value.trim(); if (v !== (m.output_price ?? null)) void save(m, { output_price: v }); }}
-                    className="w-20 rounded border border-stone-300 px-1 py-0.5" />
-                </td>
-                <td>
-                  <input defaultValue={m.strengths} aria-label={`Сильные стороны ${m.model_id}`}
-                    onBlur={(e) => { if (e.target.value !== m.strengths) void save(m, { strengths: e.target.value }); }}
-                    className="w-40 rounded border border-stone-300 px-1 py-0.5" />
-                </td>
-                <td><input type="checkbox" aria-label={`Включена ${m.model_id}`} checked={m.enabled} onChange={() => void save(m, { enabled: !m.enabled })} /></td>
-                <td className="space-x-2 whitespace-nowrap text-right">
-                  <button onClick={() => void runTest(m)} className="rounded border border-stone-500 px-2 py-1 text-stone-600">Тест</button>
-                  {tests[m.id] === "..." && <span className="text-stone-400">…</span>}
-                  {tests[m.id] && tests[m.id] !== "..." && (
-                    <span className={(tests[m.id] as { ok: boolean }).ok ? "text-green-700" : "text-red-600"}>
-                      {(tests[m.id] as { ok: boolean; detail: string }).ok ? "✓" : `✗ ${(tests[m.id] as { ok: boolean; detail: string }).detail}`}
-                    </span>
-                  )}
-                  <button onClick={() => void remove(m)} className="rounded border border-red-700 px-2 py-1 text-red-700">Удалить</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        groupedEnabled().map(([prov, mans]) => (
+          <details key={prov} className="mb-2 rounded border border-stone-200">
+            <summary className="cursor-pointer bg-stone-50 px-3 py-1.5 text-sm font-medium text-stone-700">
+              {prov} ({mans.reduce((n, [, ms]) => n + ms.length, 0)})
+            </summary>
+            <div className="px-3 py-2">
+              {mans.map(([man, ms]) => (
+                <details key={man} className="mb-1">
+                  <summary className="cursor-pointer py-1 text-sm text-stone-600">{man} ({ms.length})</summary>
+                  <table className="w-full border-collapse text-sm">
+                    <thead><tr className="border-b border-stone-200 text-left text-xs text-stone-400">
+                      <th className="py-1">ID модели</th><th>Название</th><th>Вход</th><th>Выход</th><th>Сильные стороны</th><th>Вкл.</th><th /></tr></thead>
+                    <tbody>{ms.map(renderRow)}</tbody>
+                  </table>
+                </details>
+              ))}
+            </div>
+          </details>
+        ))
       )}
     </section>
   );

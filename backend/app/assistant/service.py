@@ -47,7 +47,7 @@ def build_context(estimate: em.Estimate) -> str:
 def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]]:
     seen: dict[int, CatalogItem] = {}
     for q in (queries or [])[:_MAX_QUERIES]:
-        items, _ = catalog_service.search_items(db, q=q, limit=5)
+        items, _ = catalog_service.search_items(db, q=q, limit=8)
         for it in items:
             seen[it.id] = it
             if len(seen) >= _MAX_CANDIDATES:
@@ -57,9 +57,12 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
     items = list(seen.values())
     if not items:
         return "(каталог: подходящих позиций не найдено)", items
-    text = "КАНДИДАТЫ КАТАЛОГА (id | имя | ед | вид):\n" + "\n".join(
-        f"  {it.id} | {it.name} | {it.unit} | {it.kind}" for it in items
-    )
+    rows = []
+    for it in items:
+        work, material, _ = est_service.snapshot_line_values(db, it, None)
+        price = work + material
+        rows.append(f"  {it.id} | {it.name} | {it.unit} | {it.kind} | цена {price}")
+    text = "КАНДИДАТЫ КАТАЛОГА (catalog_item_id | имя | ед | вид | цена):\n" + "\n".join(rows)
     return text, items
 
 
@@ -115,9 +118,15 @@ def run_assistant(
         "set_qty{line_id, qty}; set_price{line_id, material_price?, work_price?}; "
         "delete_line{line_id}; delete_section{section_id}; "
         "set_section_markup{section_id, markup_percent}; set_vat{vat_enabled, vat_rate?}.\n"
-        "Правила операций: ссылайся ТОЛЬКО на реальные id из СМЕТЫ и КАНДИДАТОВ; раздел — "
-        "по имени (section_name), можно создать add_section и в том же пакете добавлять "
-        "в него строки.\n\n"
+        "ГЛАВНОЕ ПРАВИЛО: для оборудования и материалов ВСЕГДА бери позицию из списка "
+        "КАНДИДАТЫ через add_catalog_line с её catalog_item_id — НЕ придумывай позиции и "
+        "НЕ выдумывай цены (цена подставится из каталога автоматически). add_custom_line "
+        "используй ТОЛЬКО когда в КАНДИДАТАХ нет ничего подходящего (например, монтаж/"
+        "работа/услуга, которой нет в каталоге). Если в КАНДИДАТАХ пусто — скажи в reply, "
+        "что в каталоге нет подходящих позиций, и предложи, что импортировать, "
+        "а не выдумывай оборудование.\n"
+        "Ссылайся ТОЛЬКО на реальные id из СМЕТЫ и КАНДИДАТОВ; раздел — по имени "
+        "(section_name), можно создать add_section и в том же пакете добавлять в него строки.\n\n"
         f"СМЕТА:\n{context}\n\n{cand_text}"
     )
     step2 = ai_service.call_llm(

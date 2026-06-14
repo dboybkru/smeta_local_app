@@ -70,6 +70,13 @@ export type Recommendation = {
   rationale: string;
 };
 
+// «Производитель» модели — обычно префикс id до «/» (openai/gpt-4o → openai),
+// иначе первое слово (deepseek-r1 → deepseek).
+export function manufacturer(modelId: string): string {
+  if (modelId.includes("/")) return modelId.split("/")[0];
+  return modelId.split(/[-_ ]/)[0] || modelId;
+}
+
 export function listProviders() {
   return api<Provider[]>("/ai/providers");
 }
