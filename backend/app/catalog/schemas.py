@@ -82,6 +82,7 @@ class ItemOut(BaseModel):
     category: str
     kind: str
     prices: dict[int, Decimal] = {}
+    characteristics: dict | None = None
 
 
 class ItemsPageOut(BaseModel):

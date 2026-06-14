@@ -216,6 +216,7 @@ def list_items(
             category=i.category,
             kind=i.kind,
             prices=prices.get(i.id, {}),
+            characteristics=i.characteristics,
         )
         for i in items
     ]

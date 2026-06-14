@@ -69,6 +69,9 @@ class CatalogItem(Base):
     unit: Mapped[str] = mapped_column(String(20), default="шт")
     category: Mapped[str] = mapped_column(String(255), default="")
     kind: Mapped[str] = mapped_column(String(10), default="material")
+    characteristics: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=True
+    )
 
 
 class ItemPrice(Base):
