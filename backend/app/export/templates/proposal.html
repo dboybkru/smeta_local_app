@@ -31,6 +31,9 @@
     <h1>Смета</h1>
   {% endif %}
   <p>Объект: {{ object_name }}</p>
+    {% if client %}
+    <p>Заказчик: <strong>{{ client.name }}</strong>{% if client.inn %} · ИНН {{ client.inn }}{% endif %}{% if client.kpp %} · КПП {{ client.kpp }}{% endif %}{% if client.address %}<br>Адрес: {{ client.address }}{% endif %}{% if client.contact_person %}<br>Контакт: {{ client.contact_person }}{% endif %}{% if client.phone %} · {{ client.phone }}{% endif %}{% if client.email %} · {{ client.email }}{% endif %}</p>
+    {% endif %}
 
   {% if level == "full" %}
     {% if proposal.pain %}<div class="block"><strong>Задача:</strong> {{ proposal.pain }}</div>{% endif %}

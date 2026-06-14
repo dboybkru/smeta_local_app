@@ -33,6 +33,15 @@ def build_export_context(
 ) -> dict:
     if level not in LEVELS:
         level = "full"
+    client = db.get(models.Client, est.client_id) if (db is not None and est.client_id) else None
+    client_out = None
+    if client is not None:
+        client_out = {
+            "name": client.name, "inn": client.inn, "kpp": client.kpp,
+            "ogrn": client.ogrn, "address": client.address,
+            "phone": client.phone, "email": client.email,
+            "contact_person": client.contact_person,
+        }
     totals = service.compute_totals(est)
     totals_by_section = {s["section_id"]: s for s in totals["sections"]}
     chars_map = _characteristics_map(db, est)
@@ -62,6 +71,7 @@ def build_export_context(
 
     return {
         "object_name": est.object_name,
+        "client": client_out,
         "vat_enabled": est.vat_enabled,
         "vat_rate": est.vat_rate,
         "level": level,

@@ -88,3 +88,21 @@ def test_render_xlsx_is_valid_workbook(db_session):
     assert "Квартира" in text
     assert "Штукатурка" in text
     assert "Стены" in text
+
+
+def test_export_includes_client(db_session):
+    from app.estimates.models import Client, Estimate, EstimateBranch
+    u = User(email="cl@x.ru", name="U", role="estimator", status="active")
+    db_session.add(u); db_session.commit()
+    cl = Client(name="ООО Ромашка", inn="7707083893", address="г Москва")
+    db_session.add(cl); db_session.commit()
+    est = Estimate(owner_id=u.id, object_name="Объект", client_id=cl.id)
+    est.branches.append(EstimateBranch(name="Базовая"))
+    db_session.add(est); db_session.commit(); db_session.refresh(est)
+    context = ctx.build_export_context(est, level="full", public=False, db=db_session)
+    assert context["client"]["name"] == "ООО Ромашка"
+    assert context["client"]["inn"] == "7707083893"
+    data = render_xlsx(context)
+    wb = load_workbook(io.BytesIO(data))
+    text = "\n".join(str(c.value) for row in wb.active.iter_rows() for c in row if c.value)
+    assert "Ромашка" in text

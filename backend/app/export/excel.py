@@ -18,6 +18,15 @@ def render_xlsx(context: dict) -> bytes:
     ws["A1"].font = Font(bold=True, size=14)
     ws["A2"] = f"Объект: {context['object_name']}"
 
+    client = context.get("client")
+    if client:
+        parts = [client.get("name")]
+        if client.get("inn"):
+            parts.append(f"ИНН {client['inn']}")
+        if client.get("address"):
+            parts.append(client["address"])
+        ws["A3"] = "Заказчик: " + ", ".join(p for p in parts if p)
+
     proposal = context.get("proposal") or {}
     row = 4
     if context["level"] in ("full", "cover") and proposal.get("title"):
