@@ -21,10 +21,20 @@ def test_secret_roundtrip_and_has(db_session):
 
 def test_dadata_settings_endpoints(client, db_session):
     a = _admin(db_session)
-    assert client.get("/api/settings/dadata", headers=_hdr(a)).json() == {"has_token": False}
-    r = client.put("/api/settings/dadata", headers=_hdr(a), json={"token": "T"})
+    assert client.get("/api/settings/dadata", headers=_hdr(a)).json() == {
+        "has_token": False, "has_secret": False}
+    r = client.put("/api/settings/dadata", headers=_hdr(a), json={"token": "T", "secret": "S"})
     assert r.status_code == 200
-    assert client.get("/api/settings/dadata", headers=_hdr(a)).json() == {"has_token": True}
+    assert client.get("/api/settings/dadata", headers=_hdr(a)).json() == {
+        "has_token": True, "has_secret": True}
+
+
+def test_dadata_put_blank_keeps_existing(client, db_session):
+    a = _admin(db_session)
+    client.put("/api/settings/dadata", headers=_hdr(a), json={"token": "T", "secret": "S"})
+    client.put("/api/settings/dadata", headers=_hdr(a), json={"token": "", "secret": ""})
+    assert client.get("/api/settings/dadata", headers=_hdr(a)).json() == {
+        "has_token": True, "has_secret": True}
 
 
 def test_dadata_settings_admin_only(client, db_session):

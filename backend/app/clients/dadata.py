@@ -5,18 +5,25 @@ _TIMEOUT = 10.0
 
 
 def suggest_parties(
-    token: str, query: str, count: int = 10, *, http: httpx.Client | None = None
+    token: str, query: str, count: int = 10, *, secret: str = "", http: httpx.Client | None = None
 ) -> list[dict]:
-    """Подсказки организаций/ИП от DaData. Best-effort: при любой ошибке → []."""
+    """Подсказки организаций/ИП от DaData. Best-effort: при любой ошибке → [].
+    secret — X-Secret (нужен для Clean/balance API; для подсказок необязателен)."""
     if not token or not query.strip():
         return []
     owns = http is None
     http = http or httpx.Client(timeout=_TIMEOUT)
     try:
+        headers = {
+            "Authorization": f"Token {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if secret:
+            headers["X-Secret"] = secret
         resp = http.post(
             _URL,
-            headers={"Authorization": f"Token {token}", "Content-Type": "application/json",
-                     "Accept": "application/json"},
+            headers=headers,
             json={"query": query, "count": min(count, 20)},
             timeout=_TIMEOUT,
         )

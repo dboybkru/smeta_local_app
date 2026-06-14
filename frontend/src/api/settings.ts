@@ -1,5 +1,7 @@
 import { api } from "./client";
 
-export const getDadataSettings = () => api<{ has_token: boolean }>("/settings/dadata");
-export const setDadataToken = (token: string) =>
-  api<{ has_token: boolean }>("/settings/dadata", { method: "PUT", body: JSON.stringify({ token }) });
+export type DadataStatus = { has_token: boolean; has_secret: boolean };
+
+export const getDadataSettings = () => api<DadataStatus>("/settings/dadata");
+export const saveDadata = (token: string, secret: string) =>
+  api<DadataStatus>("/settings/dadata", { method: "PUT", body: JSON.stringify({ token, secret }) });

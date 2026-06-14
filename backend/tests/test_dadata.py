@@ -27,6 +27,18 @@ def test_suggest_parties_maps_fields():
     assert out[0]["management"] == "Греф Г.О."
 
 
+def test_suggest_parties_sends_secret_header():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["secret"] = request.headers.get("x-secret")
+        return httpx.Response(200, json={"suggestions": []})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    dadata.suggest_parties("tok", "сбер", secret="sec", http=http)
+    assert seen["secret"] == "sec"
+
+
 def test_suggest_parties_network_error_returns_empty():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("down")

@@ -42,7 +42,8 @@ def suggest_clients(q: str = "", db: Session = Depends(get_db)):
     token = settings_service.get_secret(db, "dadata_token")
     if not token:
         return []
-    return dadata.suggest_parties(token, q)
+    secret = settings_service.get_secret(db, "dadata_secret")
+    return dadata.suggest_parties(token, q, secret=secret)
 
 
 @router.get("/clients/{client_id}", response_model=schemas.ClientOut,
