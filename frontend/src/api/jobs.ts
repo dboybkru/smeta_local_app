@@ -10,9 +10,12 @@ export type Job = {
   error: string;
 };
 
-export function startCatalogExtract(supplierId?: number) {
-  const q = supplierId != null ? `?supplier_id=${supplierId}` : "";
-  return api<Job>(`/catalog/extract-characteristics/start${q}`, { method: "POST" });
+export function startCatalogExtract(supplierId?: number, force = false) {
+  const p = new URLSearchParams();
+  if (supplierId != null) p.set("supplier_id", String(supplierId));
+  if (force) p.set("force", "true");
+  const qs = p.toString();
+  return api<Job>(`/catalog/extract-characteristics/start${qs ? `?${qs}` : ""}`, { method: "POST" });
 }
 
 export function getJob(id: number) {

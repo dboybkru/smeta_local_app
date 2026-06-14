@@ -1,7 +1,7 @@
 import json as json_lib
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.ai.errors import AIError, AINotConfigured
@@ -323,16 +323,43 @@ def extract_characteristics(
     response_model=JobOut,
     dependencies=[Depends(require_admin)],
 )
-def start_extract_characteristics(supplier_id: int | None = None, db: Session = Depends(get_db)):
+def start_extract_characteristics(
+    supplier_id: int | None = None, force: bool = False, db: Session = Depends(get_db),
+):
     """Запускает извлечение характеристик фоновой задачей. Если активная задача уже
-    есть — возвращает её (без дублирования расхода)."""
+    есть — возвращает её (без дублирования расхода). force=true — сбросить уже
+    извлечённые характеристики (в т.ч. пустые {}) и переизвлечь заново."""
     active = db.scalars(
         select(Job).where(Job.type == "catalog_extract", Job.status.in_(("pending", "running")))
     ).first()
     if active is not None:
         return active
+    if force:
+        q = update(CatalogItem).values(characteristics=None)
+        if supplier_id is not None:
+            q = q.where(CatalogItem.supplier_id == supplier_id)
+        db.execute(q)
+        db.commit()
     job = Job(type="catalog_extract", params={"supplier_id": supplier_id})
     db.add(job)
     db.commit()
     db.refresh(job)
     return job
+
+
+@router.delete("/catalog/items", dependencies=[Depends(require_admin)])
+def clear_catalog(supplier_id: int | None = None, db: Session = Depends(get_db)):
+    """Очистка каталога (опц. по поставщику): удаляет позиции и их цены, отвязывает
+    строки смет (item_id→NULL, снапшоты сумм в сметах сохраняются)."""
+    from app.estimates.models import EstimateLine
+
+    q = select(CatalogItem.id)
+    if supplier_id is not None:
+        q = q.where(CatalogItem.supplier_id == supplier_id)
+    ids = list(db.scalars(q).all())
+    if ids:
+        db.execute(update(EstimateLine).where(EstimateLine.item_id.in_(ids)).values(item_id=None))
+        db.execute(delete(ItemPrice).where(ItemPrice.item_id.in_(ids)))
+        db.execute(delete(CatalogItem).where(CatalogItem.id.in_(ids)))
+        db.commit()
+    return {"deleted": len(ids)}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppHeader from "../components/AppHeader";
 import {
+  clearCatalog,
   getFacets,
   listItems,
   listPriceLevels,
@@ -72,10 +73,11 @@ export default function CatalogPage() {
 
   const supplierName = (id: number) => suppliers.find((s) => s.id === id)?.name ?? "—";
 
-  async function runExtract() {
+  async function runExtract(force = false) {
+    if (force && !window.confirm("Переизвлечь характеристики ЗАНОВО для всех позиций (сбросит текущие)? Это потратит токены AI.")) return;
     setExtractMsg("✨ AI: запускаю извлечение…");
     try {
-      const job = await startCatalogExtract(supplierId === "" ? undefined : supplierId);
+      const job = await startCatalogExtract(supplierId === "" ? undefined : supplierId, force);
       for (let i = 0; i < 2000; i++) {
         const j = await getJob(job.id);
         if (j.status === "done") { setExtractMsg(j.total ? `✓ Готово (${j.processed}/${j.total}).` : "✓ Готово."); break; }
@@ -86,6 +88,21 @@ export default function CatalogPage() {
       setReloadKey((k) => k + 1);
     } catch (err) {
       setExtractMsg(err instanceof Error ? err.message : "Ошибка извлечения");
+    }
+  }
+
+  async function clearAll() {
+    const scope = supplierId === "" ? "ВЕСЬ каталог" : "каталог этого поставщика";
+    if (!window.confirm(`Очистить ${scope}? Позиции и их цены будут удалены (строки смет сохранятся, но отвяжутся от каталога).`)) return;
+    setExtractMsg("");
+    try {
+      const r = await clearCatalog(supplierId === "" ? undefined : supplierId);
+      setError("");
+      setExtractMsg(`Удалено позиций: ${r.deleted}`);
+      setOffset(0);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка очистки");
     }
   }
 
@@ -127,6 +144,18 @@ export default function CatalogPage() {
             className="rounded border border-stone-700 px-3 py-1 text-stone-700"
           >
             ✨ AI: извлечь характеристики
+          </button>
+          <button
+            onClick={() => void runExtract(true)}
+            className="rounded border border-stone-500 px-3 py-1 text-stone-600"
+          >
+            Переизвлечь все
+          </button>
+          <button
+            onClick={() => void clearAll()}
+            className="rounded border border-red-700 px-3 py-1 text-red-700"
+          >
+            Очистить каталог
           </button>
           {extractMsg && <span className="text-stone-500">{extractMsg}</span>}
         </div>

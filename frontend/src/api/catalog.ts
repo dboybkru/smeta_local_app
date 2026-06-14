@@ -111,6 +111,11 @@ export const listItems = (f: ItemFilters = {}) => {
   return api<ItemsPage>(`/catalog/items?${params.toString()}`);
 };
 
+export const clearCatalog = (supplierId?: number) => {
+  const q = supplierId != null ? `?supplier_id=${supplierId}` : "";
+  return api<{ deleted: number }>(`/catalog/items${q}`, { method: "DELETE" });
+};
+
 export const getFacets = (supplierId?: number, kind?: string) => {
   const p = new URLSearchParams();
   if (supplierId != null) p.set("supplier_id", String(supplierId));
