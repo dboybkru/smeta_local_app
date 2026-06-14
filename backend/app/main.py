@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.ai.router import router as ai_router
+from app.assistant.router import router as assistant_router
 from app.auth.admin_router import router as admin_router
 from app.auth.router import router as auth_router
 from app.catalog.router import router as catalog_router
@@ -16,6 +17,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(catalog_router)
 app.include_router(estimates_router)
+app.include_router(assistant_router)
 app.include_router(profile_router)
 app.include_router(proposals_router)
 app.include_router(export_router)
