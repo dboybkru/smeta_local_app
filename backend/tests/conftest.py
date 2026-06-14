@@ -1,17 +1,24 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.auth import models as _models  # noqa: F401  — регистрирует таблицы в metadata
-from app.catalog import models as _catalog_models  # noqa: F401
-from app.core.db import Base, get_db
-from app.estimates import models as _estimate_models  # noqa: F401
-from app.profile import models as _profile_models  # noqa: F401
-from app.publiclinks import models as _publiclink_models  # noqa: F401
-from app.ai import models as _ai_models  # noqa: F401
-from app.main import app
+# Воркер-поток не запускаем в тестах (он бы лез в реальную БД через SessionLocal).
+# Должно стоять до создания TestClient (триггерит lifespan→start_worker).
+os.environ.setdefault("JOBS_WORKER_DISABLED", "1")
+
+from app.auth import models as _models  # noqa: E402, F401 — регистрирует таблицы в metadata
+from app.catalog import models as _catalog_models  # noqa: E402, F401
+from app.core.db import Base, get_db  # noqa: E402
+from app.estimates import models as _estimate_models  # noqa: E402, F401
+from app.profile import models as _profile_models  # noqa: E402, F401
+from app.publiclinks import models as _publiclink_models  # noqa: E402, F401
+from app.ai import models as _ai_models  # noqa: E402, F401
+from app.jobs import models as _jobs_models  # noqa: E402, F401
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture()

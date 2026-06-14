@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import AppHeader from "../components/AppHeader";
 import {
-  extractCharacteristics,
   listItems,
   listPriceLevels,
   listSuppliers,
@@ -9,6 +8,7 @@ import {
   type PriceLevel,
   type Supplier,
 } from "../api/catalog";
+import { getJob, startCatalogExtract } from "../api/jobs";
 
 const PAGE_SIZE = 50;
 
@@ -63,12 +63,15 @@ export default function CatalogPage() {
   const supplierName = (id: number) => suppliers.find((s) => s.id === id)?.name ?? "—";
 
   async function runExtract() {
-    setExtractMsg("✨ AI: извлекаю характеристики…");
+    setExtractMsg("✨ AI: запускаю извлечение…");
     try {
-      for (let i = 0; i < 200; i++) {
-        const r = await extractCharacteristics(supplierId === "" ? undefined : supplierId);
-        if (r.remaining <= 0) { setExtractMsg("✓ Готово."); break; }
-        setExtractMsg(`✨ AI: извлекаю… осталось ${r.remaining}`);
+      const job = await startCatalogExtract(supplierId === "" ? undefined : supplierId);
+      for (let i = 0; i < 2000; i++) {
+        const j = await getJob(job.id);
+        if (j.status === "done") { setExtractMsg(j.total ? `✓ Готово (${j.processed}/${j.total}).` : "✓ Готово."); break; }
+        if (j.status === "error") { setExtractMsg(`Ошибка: ${j.error || "проверьте цель «catalog_extract»"}`); break; }
+        setExtractMsg(`✨ AI: ${j.message || "обработка…"}`);
+        await new Promise((r) => setTimeout(r, 1500));
       }
       setReloadKey((k) => k + 1);
     } catch (err) {

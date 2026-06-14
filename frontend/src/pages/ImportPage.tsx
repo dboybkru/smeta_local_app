@@ -3,7 +3,6 @@ import AppHeader from "../components/AppHeader";
 import ColumnMapper from "../components/ColumnMapper";
 import {
   createSupplier,
-  extractCharacteristics,
   importFile,
   inspectFile,
   listPriceLevels,
@@ -14,6 +13,7 @@ import {
   type PriceLevel,
   type Supplier,
 } from "../api/catalog";
+import { getJob, startCatalogExtract } from "../api/jobs";
 import { ApiError } from "../api/client";
 
 type Step = "upload" | "map" | "result";
@@ -130,20 +130,24 @@ export default function ImportPage() {
 
   async function runExtract() {
     if (supplierId === "") return;
-    setExtractMsg("✨ AI: извлекаю характеристики…");
+    setExtractMsg("✨ AI: запускаю извлечение характеристик…");
     try {
-      for (let i = 0; i < 200; i++) {
-        const r = await extractCharacteristics(supplierId);
-        if (r.remaining <= 0) {
-          setExtractMsg(r.processed > 0 || i > 0 ? "✓ Характеристики извлечены." : "");
+      const job = await startCatalogExtract(supplierId);
+      for (let i = 0; i < 2000; i++) {
+        const j = await getJob(job.id);
+        if (j.status === "done") {
+          setExtractMsg(j.total ? `✓ Характеристики извлечены (${j.processed}/${j.total}).` : "✓ Готово.");
           return;
         }
-        setExtractMsg(`✨ AI: извлекаю характеристики… осталось ${r.remaining}`);
+        if (j.status === "error") {
+          setExtractMsg(`Характеристики не извлечены: ${j.error || "ошибка (проверьте цель «catalog_extract»)"}`);
+          return;
+        }
+        setExtractMsg(`✨ AI: ${j.message || "обработка характеристик…"}`);
+        await new Promise((r) => setTimeout(r, 1500));
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 503)
-        setExtractMsg("AI не настроен — характеристики пропущены (настройте цель «catalog_extract»).");
-      else setExtractMsg(err instanceof Error ? `Характеристики: ${err.message}` : "");
+      setExtractMsg(err instanceof Error ? `Характеристики: ${err.message}` : "");
     }
   }
 

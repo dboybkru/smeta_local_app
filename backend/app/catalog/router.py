@@ -26,6 +26,8 @@ from app.catalog.schemas import (
     SupplierOut,
 )
 from app.core.db import get_db
+from app.jobs.models import Job
+from app.jobs.schemas import JobOut
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
@@ -287,3 +289,23 @@ def extract_characteristics(
         raise HTTPException(status_code=503, detail=str(exc))
     except AIError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post(
+    "/catalog/extract-characteristics/start",
+    response_model=JobOut,
+    dependencies=[Depends(require_admin)],
+)
+def start_extract_characteristics(supplier_id: int | None = None, db: Session = Depends(get_db)):
+    """Запускает извлечение характеристик фоновой задачей. Если активная задача уже
+    есть — возвращает её (без дублирования расхода)."""
+    active = db.scalars(
+        select(Job).where(Job.type == "catalog_extract", Job.status.in_(("pending", "running")))
+    ).first()
+    if active is not None:
+        return active
+    job = Job(type="catalog_extract", params={"supplier_id": supplier_id})
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
