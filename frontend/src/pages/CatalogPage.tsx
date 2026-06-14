@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppHeader from "../components/AppHeader";
 import {
+  getFacets,
   listItems,
   listPriceLevels,
   listSuppliers,
@@ -24,6 +25,8 @@ export default function CatalogPage() {
   const [error, setError] = useState("");
   const [extractMsg, setExtractMsg] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [facets, setFacets] = useState<Record<string, string[]>>({});
+  const [selected, setSelected] = useState<Record<string, string>>({});
 
   useEffect(() => {
     Promise.all([listPriceLevels(), listSuppliers()])
@@ -34,6 +37,12 @@ export default function CatalogPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Ошибка загрузки"));
   }, []);
 
+  useEffect(() => {
+    setSelected({});
+    void getFacets(supplierId === "" ? undefined : supplierId, kind || undefined)
+      .then(setFacets).catch(() => setFacets({}));
+  }, [supplierId, kind]);
+
   // Debounced search whenever filters change. Reset offset to 0 on filter change.
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -43,6 +52,7 @@ export default function CatalogPage() {
         kind: kind || undefined,
         limit: PAGE_SIZE,
         offset,
+        facets: Object.keys(selected).length ? selected : undefined,
       })
         .then((page) => {
           setItems(page.items);
@@ -51,7 +61,7 @@ export default function CatalogPage() {
         .catch((err) => setError(err instanceof Error ? err.message : "Ошибка поиска"));
     }, 250);
     return () => clearTimeout(handle);
-  }, [q, supplierId, kind, offset, reloadKey]);
+  }, [q, supplierId, kind, offset, reloadKey, selected]);
 
   function onFilterChange<T>(setter: (v: T) => void) {
     return (value: T) => {
@@ -120,6 +130,29 @@ export default function CatalogPage() {
           </button>
           {extractMsg && <span className="text-stone-500">{extractMsg}</span>}
         </div>
+
+        {Object.keys(facets).length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            {Object.entries(facets).map(([key, values]) => (
+              <select key={key} aria-label={`Фильтр: ${key}`} value={selected[key] ?? ""}
+                onChange={(e) => {
+                  setOffset(0);
+                  setSelected((s) => {
+                    const next = { ...s };
+                    if (e.target.value === "") delete next[key]; else next[key] = e.target.value;
+                    return next;
+                  });
+                }}
+                className="rounded border border-stone-300 px-2 py-1">
+                <option value="">{key}: любое</option>
+                {values.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            ))}
+            {Object.keys(selected).length > 0 && (
+              <button onClick={() => { setOffset(0); setSelected({}); }} className="text-stone-500">Сбросить фильтры</button>
+            )}
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
