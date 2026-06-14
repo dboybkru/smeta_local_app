@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppHeader from "../components/AppHeader";
 import {
+  extractCharacteristics,
   listItems,
   listPriceLevels,
   listSuppliers,
@@ -21,6 +22,8 @@ export default function CatalogPage() {
   const [kind, setKind] = useState<"" | "material" | "work">("");
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
+  const [extractMsg, setExtractMsg] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     Promise.all([listPriceLevels(), listSuppliers()])
@@ -48,7 +51,7 @@ export default function CatalogPage() {
         .catch((err) => setError(err instanceof Error ? err.message : "Ошибка поиска"));
     }, 250);
     return () => clearTimeout(handle);
-  }, [q, supplierId, kind, offset]);
+  }, [q, supplierId, kind, offset, reloadKey]);
 
   function onFilterChange<T>(setter: (v: T) => void) {
     return (value: T) => {
@@ -58,6 +61,20 @@ export default function CatalogPage() {
   }
 
   const supplierName = (id: number) => suppliers.find((s) => s.id === id)?.name ?? "—";
+
+  async function runExtract() {
+    setExtractMsg("✨ AI: извлекаю характеристики…");
+    try {
+      for (let i = 0; i < 200; i++) {
+        const r = await extractCharacteristics(supplierId === "" ? undefined : supplierId);
+        if (r.remaining <= 0) { setExtractMsg("✓ Готово."); break; }
+        setExtractMsg(`✨ AI: извлекаю… осталось ${r.remaining}`);
+      }
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setExtractMsg(err instanceof Error ? err.message : "Ошибка извлечения");
+    }
+  }
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -92,6 +109,13 @@ export default function CatalogPage() {
             <option value="material">Материалы</option>
             <option value="work">Работы</option>
           </select>
+          <button
+            onClick={() => void runExtract()}
+            className="rounded border border-stone-700 px-3 py-1 text-stone-700"
+          >
+            ✨ AI: извлечь характеристики
+          </button>
+          {extractMsg && <span className="text-stone-500">{extractMsg}</span>}
         </div>
 
         <div className="overflow-x-auto">
@@ -102,6 +126,7 @@ export default function CatalogPage() {
               <th>Наименование</th>
               <th>Поставщик</th>
               <th>Ед.</th>
+              <th>Характеристики</th>
               {levels.map((l) => (
                 <th key={l.id} className="text-right">{l.name}</th>
               ))}
@@ -114,6 +139,13 @@ export default function CatalogPage() {
                 <td className="text-stone-900">{it.name}</td>
                 <td className="text-stone-500">{supplierName(it.supplier_id)}</td>
                 <td className="text-stone-500">{it.unit}</td>
+                <td className="max-w-xs text-xs text-stone-500">
+                  {it.characteristics
+                    ? Object.entries(it.characteristics).slice(0, 4).map(([k, v]) => (
+                        <span key={k} className="mr-1 inline-block rounded bg-stone-100 px-1">{k}: {v}</span>
+                      ))
+                    : ""}
+                </td>
                 {levels.map((l) => (
                   <td key={l.id} className="text-right tabular-nums">
                     {it.prices[String(l.id)] ?? "—"}
