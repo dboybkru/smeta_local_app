@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 from app.auth.deps import require_active
 from app.auth.models import User
 from app.catalog.models import CatalogItem
+from app.clients import dadata
 from app.core.db import get_db
 from app.estimates import models, schemas, service
+from app.settings import service as settings_service
 
 router = APIRouter(prefix="/api", tags=["estimates"])
 
@@ -33,6 +35,14 @@ def create_client(
     db.commit()
     db.refresh(client)
     return client
+
+
+@router.get("/clients/suggest", dependencies=[Depends(require_active)])
+def suggest_clients(q: str = "", db: Session = Depends(get_db)):
+    token = settings_service.get_secret(db, "dadata_token")
+    if not token:
+        return []
+    return dadata.suggest_parties(token, q)
 
 
 @router.get("/estimates", response_model=list[schemas.EstimateOut])
