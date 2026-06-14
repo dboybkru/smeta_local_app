@@ -40,6 +40,22 @@ def _estimate_with_catalog(db_session):
     return est, item
 
 
+def test_build_context_includes_totals_and_line_sums(db_session):
+    from app.estimates import models as em
+    est, item = _estimate_with_catalog(db_session)
+    sec = em.EstimateSection(branch_id=est.branches[0].id, name="Обор", sort_order=0)
+    db_session.add(sec); db_session.commit()
+    db_session.add(em.EstimateLine(
+        section_id=sec.id, name="Камера", unit="шт", qty=Decimal("2"),
+        material_price=Decimal("100"), work_price=Decimal("0"),
+    ))
+    db_session.commit(); db_session.refresh(est)
+    ctx = asvc.build_context(est)
+    assert "ИТОГО" in ctx
+    assert "сумма 200" in ctx  # 2 × 100
+    assert "Обор" in ctx
+
+
 def test_run_assistant_two_step(db_session, monkeypatch):
     est, item = _estimate_with_catalog(db_session)
     calls = [

@@ -15,19 +15,31 @@ _MAX_TOKENS = 1500
 
 
 def build_context(estimate: em.Estimate) -> str:
+    totals = est_service.compute_totals(estimate)
+    sec_totals = {s["section_id"]: s for s in totals["sections"]}
+    nds = f"вкл {estimate.vat_rate}%" if estimate.vat_enabled else "выкл"
+    margin = totals.get("margin")
     lines: list[str] = [
-        f"Смета #{estimate.id}: {estimate.object_name or '(без названия)'}; "
-        f"НДС {'вкл ' + str(estimate.vat_rate) + '%' if estimate.vat_enabled else 'выкл'}."
+        f"Смета #{estimate.id}: {estimate.object_name or '(без названия)'}; НДС {nds}.",
+        f"ИТОГО: материалы {totals['materials']}, работы {totals['works']}, "
+        f"без НДС {totals['subtotal']}, НДС {totals['vat']}, ВСЕГО {totals['total']}"
+        + (f", маржа {margin}" if margin is not None else "") + ".",
     ]
     branch = est_service.base_branch(estimate)
     for s in branch.sections:
-        lines.append(f"Раздел #{s.id} «{s.name}» (наценка {s.markup_percent}%):")
+        st = sec_totals.get(s.id, {})
+        lines.append(
+            f"Раздел #{s.id} «{s.name}» (наценка {s.markup_percent}%; "
+            f"итог раздела {st.get('total', '?')}):"
+        )
         for ln in s.lines:
+            unit_price = (ln.material_price or 0) + (ln.work_price or 0)
+            summ = (ln.qty or 0) * unit_price
             lines.append(
                 f"  строка #{ln.id}: {ln.name} | {ln.qty} {ln.unit} | "
-                f"мат {ln.material_price} / раб {ln.work_price}"
+                f"цена {unit_price} | сумма {summ}"
             )
-    if len(lines) == 1:
+    if not branch.sections:
         lines.append("(смета пустая)")
     return "\n".join(lines)
 
@@ -86,20 +98,26 @@ def run_assistant(
 
     cand_text, _ = _candidates(db, queries)
 
-    # Шаг 2 — changeset
+    # Шаг 2 — ответ + changeset
     ops_prompt = (
-        "Ты агент-редактор сметы. Сформируй изменения сметы под просьбу пользователя.\n"
-        "Доступные операции (поле op): add_section{name}; "
+        "Ты — толковый помощник-сметчик внутри редактора смет. Отвечай по-русски, "
+        "КОНКРЕТНО и КРАТКО, по существу ИМЕННО ЭТОЙ сметы — используй её реальные числа "
+        "(суммы, кол-во, наценку, итоги из блока СМЕТА). НЕ задавай встречных вопросов, "
+        "если можешь дать полезный ответ; не лей воду и не перечисляй, что «можно было бы» "
+        "проверить — сразу делай это.\n"
+        "Если просят ПРОВЕРИТЬ/проанализировать/посоветовать или задают вопрос — дай "
+        "конкретные наблюдения и рекомендации по этой смете в reply (operations можно "
+        "оставить пустым; либо предложи операции-исправления, если уместно). "
+        "Если просят ИЗМЕНИТЬ смету — верни операции и кратко опиши их в reply.\n"
+        "Операции (поле op): add_section{name}; "
         "add_catalog_line{section_name, catalog_item_id, qty}; "
         "add_custom_line{section_name, name, unit, qty, material_price, work_price}; "
         "set_qty{line_id, qty}; set_price{line_id, material_price?, work_price?}; "
         "delete_line{line_id}; delete_section{section_id}; "
         "set_section_markup{section_id, markup_percent}; set_vat{vat_enabled, vat_rate?}.\n"
-        "Правила: ссылайся ТОЛЬКО на реальные id из СМЕТЫ и КАНДИДАТОВ. Раздел указывай по имени "
-        "(section_name) — можешь создать раздел add_section и в том же пакете добавлять "
-        "в него строки. "
-        "Если изменения не нужны — пустой operations. В reply кратко по-русски опиши, "
-        "что предлагаешь.\n\n"
+        "Правила операций: ссылайся ТОЛЬКО на реальные id из СМЕТЫ и КАНДИДАТОВ; раздел — "
+        "по имени (section_name), можно создать add_section и в том же пакете добавлять "
+        "в него строки.\n\n"
         f"СМЕТА:\n{context}\n\n{cand_text}"
     )
     step2 = ai_service.call_llm(
