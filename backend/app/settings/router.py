@@ -1,0 +1,28 @@
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.auth.deps import require_admin
+from app.auth.models import User
+from app.core.db import get_db
+from app.settings import service
+
+router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+DADATA_KEY = "dadata_token"
+
+
+class DadataIn(BaseModel):
+    token: str = ""
+
+
+@router.get("/dadata", dependencies=[Depends(require_admin)])
+def get_dadata(db: Session = Depends(get_db)):
+    return {"has_token": service.has_secret(db, DADATA_KEY)}
+
+
+@router.put("/dadata", dependencies=[Depends(require_admin)])
+def set_dadata(body: DadataIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    if body.token.strip():
+        service.set_secret(db, DADATA_KEY, body.token.strip())
+    return {"has_token": service.has_secret(db, DADATA_KEY)}

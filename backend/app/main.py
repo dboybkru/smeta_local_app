@@ -15,6 +15,7 @@ from app.profile.router import router as profile_router
 from app.proposals.router import router as proposals_router
 from app.publiclinks.public_router import router as public_page_router
 from app.publiclinks.router import router as publiclinks_router
+from app.settings.router import router as settings_router
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ app.include_router(publiclinks_router)
 app.include_router(public_page_router)
 app.include_router(ai_router)
 app.include_router(jobs_router)
+app.include_router(settings_router)
 
 
 @app.get("/api/health")
