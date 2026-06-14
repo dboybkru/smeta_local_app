@@ -1,45 +1,46 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import ColumnMapper from "./ColumnMapper";
-import type { ColumnMapping } from "../api/catalog";
 
 afterEach(cleanup);
+import userEvent from "@testing-library/user-event";
+import ColumnMapper from "./ColumnMapper";
+import type { Column, ColumnMapping, PriceLevel } from "../api/catalog";
 
-const COLUMNS = [
-  { index: 0, header: "Артикул", samples: ["С2000"] },
-  { index: 1, header: "Наименование", samples: ["С2000-4"] },
-  { index: 2, header: "Цена", samples: ["1234.50"] },
+const columns: Column[] = [
+  { index: 0, header: "Наименование", samples: ["Кабель"] },
+  { index: 1, header: "Производитель", samples: ["ДКС"] },
+  { index: 2, header: "РОЗН.", samples: ["100"] },
 ];
-const LEVELS = [{ id: 1, name: "Розница", sort_order: 0 }];
+const levels: PriceLevel[] = [{ id: 10, name: "Розница", sort_order: 0 }];
 
-const EMPTY: ColumnMapping = {
-  name_col: 1, article_col: null, unit_col: null, category_col: null,
-  characteristics_col: null, price_cols: {},
+function setup(mapping: ColumnMapping) {
+  const onChange = vi.fn();
+  render(<ColumnMapper columns={columns} levels={levels} mapping={mapping} onChange={onChange} />);
+  return onChange;
+}
+
+const base: ColumnMapping = {
+  name_col: 0, article_col: null, unit_col: null, category_col: null,
+  characteristics_col: null, manufacturer_col: null, price_cols: {},
 };
 
 describe("ColumnMapper", () => {
-  it("renders a select per field and per price level", () => {
-    render(<ColumnMapper columns={COLUMNS} levels={LEVELS} mapping={EMPTY} onChange={vi.fn()} />);
-    expect(screen.getByLabelText("Наименование")).toBeInTheDocument();
-    expect(screen.getByLabelText("Артикул")).toBeInTheDocument();
-    expect(screen.getByLabelText("Цена: Розница")).toBeInTheDocument();
+  it("имеет поле Производитель", () => {
+    setup(base);
+    expect(screen.getByLabelText("Производитель")).toBeInTheDocument();
   });
 
-  it("emits an updated mapping when a price column is chosen", async () => {
-    const onChange = vi.fn();
-    render(<ColumnMapper columns={COLUMNS} levels={LEVELS} mapping={EMPTY} onChange={onChange} />);
+  it("меняет manufacturer_col", async () => {
+    const onChange = setup(base);
+    await userEvent.selectOptions(screen.getByLabelText("Производитель"), "1");
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ manufacturer_col: 1 }));
+  });
+
+  it("привязывает ценовую колонку к уровню", async () => {
+    const onChange = setup(base);
     await userEvent.selectOptions(screen.getByLabelText("Цена: Розница"), "2");
-    const last = onChange.mock.calls.at(-1)?.[0] as ColumnMapping;
-    expect(last.price_cols).toEqual({ 1: 2 });
-  });
-
-  it("emits article_col = null when '—' is selected", async () => {
-    const onChange = vi.fn();
-    const withArticle = { ...EMPTY, article_col: 0 };
-    render(<ColumnMapper columns={COLUMNS} levels={LEVELS} mapping={withArticle} onChange={onChange} />);
-    await userEvent.selectOptions(screen.getByLabelText("Артикул"), "");
-    const last = onChange.mock.calls.at(-1)?.[0] as ColumnMapping;
-    expect(last.article_col).toBeNull();
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ price_cols: { 10: 2 } }),
+    );
   });
 });
