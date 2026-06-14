@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
+import AssistantPanel from "../components/estimate/AssistantPanel";
 import EstimateHeader from "../components/estimate/EstimateHeader";
 import EstimateTabs from "../components/estimate/EstimateTabs";
 import EstimateTotalsBar from "../components/estimate/EstimateTotalsBar";
@@ -16,6 +17,7 @@ export default function EstimateEditorPage() {
   const e = useEstimate(estimateId);
   const [clients, setClients] = useState<Client[]>([]);
   const [newSection, setNewSection] = useState("");
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     listClients().then(setClients).catch(() => setClients([]));
@@ -89,6 +91,21 @@ export default function EstimateEditorPage() {
         kp={<ProposalTab estimateId={est.id} initial={est.proposal} canEdit={e.canEdit} />}
         share={<ShareTab estimateId={est.id} canEdit={e.canEdit} />}
       />
+      {e.canEdit && !assistantOpen && (
+        <button
+          onClick={() => setAssistantOpen(true)}
+          className="fixed bottom-6 right-6 z-30 rounded-full border border-stone-700 bg-white px-4 py-2 text-stone-700 shadow-lg"
+        >
+          ✨ Ассистент
+        </button>
+      )}
+      {e.canEdit && assistantOpen && (
+        <AssistantPanel
+          estimateId={est.id}
+          onApplied={() => void e.reload()}
+          onClose={() => setAssistantOpen(false)}
+        />
+      )}
     </Shell>
   );
 }

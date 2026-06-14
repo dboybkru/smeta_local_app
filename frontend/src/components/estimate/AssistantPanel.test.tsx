@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("AssistantPanel", () => {
   it("sends a message, shows reply + changeset, applies it", async () => {
-    const f = vi.fn(async (url: string, init?: RequestInit) => {
+    const f = vi.fn(async (url: string) => {
       if (url.includes("/assistant/chat"))
         return json({ reply: "Добавил раздел", operations: [{ op: "add_section", name: "Обор" }] });
       if (url.includes("/assistant/apply"))
