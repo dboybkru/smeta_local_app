@@ -114,17 +114,44 @@ def _sample(rows: Rows, data_start: int, col: int) -> str:
     return ""
 
 
+def _generic_price_col(header: list) -> int | None:
+    for col, cell in enumerate(header):
+        if _norm(cell) in GENERIC_PRICE:
+            return col
+    return None
+
+
 def _is_two_row(rows: Rows, header_row: int) -> bool:
-    return False
+    header = rows[header_row]
+    gen = _generic_price_col(header)
+    if gen is None or header_row + 1 >= len(rows):
+        return False
+    sub = rows[header_row + 1]
+    # Cells before the generic price column must be empty (sub-label row, not data row)
+    if any(c is not None and str(c).strip() for c in sub[:gen]):
+        return False
+    return any(c is not None and str(c).strip() for c in sub[gen:])
 
 
 def _detect_price_columns(rows: Rows, header_row: int) -> list[PriceColumn]:
-    out: list[PriceColumn] = []
-    for col, cell in enumerate(rows[header_row]):
+    header = rows[header_row]
+    if _is_two_row(rows, header_row):
+        gen = _generic_price_col(header)
+        on_req = _on_request_label(_norm(header[gen]))
+        sub = rows[header_row + 1]
+        out: list[PriceColumn] = []
+        for col in range(gen, len(sub)):
+            val = sub[col]
+            if val is not None and str(val).strip():
+                out.append(PriceColumn(index=col, label=f"Цена {str(val).strip()}",
+                                       on_request=on_req))
+        return out
+    out = []
+    for col, cell in enumerate(header):
         norm = _norm(cell)
         if not norm or _match_role(norm):
             continue
-        if _is_price_word(norm):
+        if _is_price_word(norm) or norm in GENERIC_PRICE:
             out.append(PriceColumn(index=col, label=str(cell).strip(),
                                    on_request=_on_request_label(norm)))
     return out
