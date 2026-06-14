@@ -69,6 +69,21 @@ def test_extract_batch_empty_when_nothing_to_do(db_session, monkeypatch):
     assert res == {"processed": 0, "remaining": 0}
 
 
+def test_extract_uses_raw_as_source(db_session, monkeypatch):
+    it = _item(db_session, name="Камера X")
+    it.characteristics_raw = "2 Мп, объектив 2.8мм, IP67"
+    db_session.commit()
+    captured = {}
+    def fake(db, purpose, messages, **k):
+        captured["prompt"] = messages[-1]["content"]
+        return {"items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп"}}]}
+    monkeypatch.setattr(ai_service, "call_llm", fake)
+    ch.extract_batch(db_session, batch=40)
+    assert "2.8мм" in captured["prompt"]  # сырьё попало в промпт
+    db_session.refresh(it)
+    assert it.characteristics == {"Разрешение": "2 Мп"}
+
+
 from app.ai.errors import AINotConfigured  # noqa: E402
 from app.auth.models import User as _User  # noqa: E402
 

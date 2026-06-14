@@ -44,16 +44,20 @@ def extract_batch(db: Session, batch: int = 40, supplier_id: int | None = None) 
     if not items:
         return {"processed": 0, "remaining": 0}
 
-    payload = [{"id": it.id, "name": it.name, "unit": it.unit, "kind": it.kind} for it in items]
+    payload = [
+        {"id": it.id, "text": (it.characteristics_raw or it.name), "unit": it.unit, "kind": it.kind}
+        for it in items
+    ]
     prompt = (
-        "Ты — инженер по оборудованию. Для каждой позиции извлеки ключевые технические "
-        "характеристики ИЗ НАЗВАНИЯ в виде пар ключ-значение на русском "
-        "(например «Разрешение»:«2 Мп», «Питание»:«PoE», «Степень защиты»:«IP67»). "
-        "Если по названию характеристик не определить — пустой объект {}. "
+        "Ты — инженер по оборудованию. Для каждой позиции извлеки технические "
+        "характеристики из описания (text) в пары ключ-значение на русском. "
+        "Используй ЕДИНУЮ терминологию ключей (Разрешение, Объектив, Фокусное расстояние, "
+        "Температурный режим, Степень защиты, Питание, Матрица и т.п.) — одинаковые понятия "
+        "обозначай одинаковым ключом. Значения кратко. Если данных нет — пустой объект {}. "
         "Верни строго JSON {\"items\":[{\"id\":<id>,\"characteristics\":{...}}]} "
         "по ВСЕМ позициям.\n\n"
         "ПОЗИЦИИ:\n"
-        + "\n".join(f"  id={p['id']} | {p['name']} | {p['unit']} | {p['kind']}" for p in payload)
+        + "\n".join(f"  id={p['id']} | {p['text']} | {p['unit']} | {p['kind']}" for p in payload)
     )
     result = ai_service.call_llm(
         db, PURPOSE, [{"role": "user", "content": prompt}],
