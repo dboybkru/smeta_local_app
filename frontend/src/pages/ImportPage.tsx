@@ -8,6 +8,8 @@ import {
   listPriceLevels,
   listSuppliers,
   type ColumnMapping,
+  type DetectedLayout,
+  type ImportSheetMapping,
   type ImportSummary,
   type InspectResult,
   type PriceLevel,
@@ -16,11 +18,31 @@ import {
 import { getJob, startCatalogExtract } from "../api/jobs";
 import { ApiError } from "../api/client";
 
+export function mappingFromDetected(d: DetectedLayout, levels: PriceLevel[]): ColumnMapping {
+  const price_cols: Record<number, number> = {};
+  d.price_columns.forEach((pc, i) => {
+    if (i < levels.length) price_cols[levels[i].id] = pc.index;
+  });
+  return {
+    name_col: d.name_col ?? 0,
+    article_col: d.article_col,
+    unit_col: d.unit_col,
+    category_col: null,
+    characteristics_col: d.chars_col,
+    manufacturer_col: d.manufacturer_col,
+    header_row: d.header_row,
+    data_start_row: d.data_start_row,
+    price_cols,
+    on_request_cols: d.price_columns.filter((p) => p.on_request).map((p) => p.index),
+  };
+}
+
 type Step = "upload" | "map" | "result";
 
 const EMPTY_MAPPING: ColumnMapping = {
   name_col: 0, article_col: null, unit_col: null, category_col: null,
-  characteristics_col: null, price_cols: {},
+  characteristics_col: null, manufacturer_col: null, header_row: 0,
+  data_start_row: null, price_cols: {}, on_request_cols: [],
 };
 
 export default function ImportPage() {
@@ -34,7 +56,7 @@ export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [inspectResult, setInspectResult] = useState<InspectResult | null>(null);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<ColumnMapping>(EMPTY_MAPPING);
+  const [mappings, setMappings] = useState<Record<string, ColumnMapping>>({});
   const [useSheetAsCategory, setUseSheetAsCategory] = useState(false);
   const [saveMapping, setSaveMapping] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -51,11 +73,13 @@ export default function ImportPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Ошибка загрузки"));
   }, []);
 
-  // Columns to map come from the first selected sheet (mapping applies to all selected sheets).
+  // Columns to map come from the first selected sheet; edit that sheet's mapping.
+  const activeSheet = selectedSheets[0] ?? "";
   const mapColumns = useMemo(() => {
-    const sheet = inspectResult?.sheets.find((s) => s.name === selectedSheets[0]);
+    const sheet = inspectResult?.sheets.find((s) => s.name === activeSheet);
     return sheet?.columns ?? [];
-  }, [inspectResult, selectedSheets]);
+  }, [inspectResult, activeSheet]);
+  const activeMapping = mappings[activeSheet] ?? EMPTY_MAPPING;
 
   async function addSupplier() {
     const nm = newSupplierName.trim();
@@ -85,9 +109,16 @@ export default function ImportPage() {
       setInspectResult(res);
       const allSheets = res.sheets.map((s) => s.name);
       setSelectedSheets(allSheets);
-      // Prefill mapping from the supplier template if present.
-      const tmpl = suppliers.find((s) => s.id === supplierId)?.column_mapping_template;
-      setMapping(tmpl ?? EMPTY_MAPPING);
+      // Prefill per-sheet mappings from detected layout, falling back to template/empty.
+      const tmpl = suppliers.find((s) => s.id === supplierId)?.column_mapping_template as
+        | ColumnMapping | undefined;
+      const next: Record<string, ColumnMapping> = {};
+      for (const s of res.sheets) {
+        next[s.name] = s.detected
+          ? mappingFromDetected(s.detected, levels)
+          : (tmpl ?? EMPTY_MAPPING);
+      }
+      setMappings(next);
       setStep("map");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось разобрать файл");
@@ -110,12 +141,15 @@ export default function ImportPage() {
     setBusy(true);
     setError("");
     try {
+      const sheet_mappings: ImportSheetMapping[] = selectedSheets.map((name) => ({
+        name,
+        mapping: mappings[name] ?? EMPTY_MAPPING,
+      }));
       const res = await importFile({
         file,
         supplier_id: supplierId,
         kind,
-        sheets: selectedSheets,
-        mapping,
+        sheet_mappings,
         use_sheet_as_category: useSheetAsCategory,
         save_mapping: saveMapping,
       });
@@ -157,7 +191,7 @@ export default function ImportPage() {
     setFile(null);
     setInspectResult(null);
     setSelectedSheets([]);
-    setMapping(EMPTY_MAPPING);
+    setMappings({});
     setSummary(null);
     setError("");
     setExtractMsg("");
@@ -254,7 +288,18 @@ export default function ImportPage() {
               ))}
             </div>
 
-            <ColumnMapper columns={mapColumns} levels={levels} mapping={mapping} onChange={setMapping} />
+            {selectedSheets.length > 1 && (
+              <p className="text-xs text-stone-400">
+                Показан маппинг листа «{activeSheet}». Остальные листы размечены автоматически по заголовкам.
+              </p>
+            )}
+
+            <ColumnMapper
+              columns={mapColumns}
+              levels={levels}
+              mapping={activeMapping}
+              onChange={(m) => setMappings((cur) => ({ ...cur, [activeSheet]: m }))}
+            />
 
             <div className="space-y-2">
               <label className="flex items-center gap-2">
