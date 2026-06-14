@@ -78,6 +78,40 @@ def test_call_llm_json_invalid_raises_aierror(db_session, monkeypatch):
                          json_schema={"type": "object"})
 
 
+def test_call_llm_json_none_content_raises_aierror(db_session, monkeypatch):
+    # модель в json-режиме вернула content=None (исчерпан лимит токенов) →
+    # AIError, а НЕ TypeError из json.loads(None)
+    _setup(db_session)
+    monkeypatch.setattr(client, "chat_completion",
+                        lambda *a, **kw: _r(None))
+    with pytest.raises(AIError):
+        service.call_llm(db_session, "proposal_generation",
+                         [{"role": "user", "content": "hi"}],
+                         json_schema={"type": "object"})
+
+
+def test_call_llm_none_content_text_mode_returns_empty(db_session, monkeypatch):
+    _setup(db_session)
+    monkeypatch.setattr(client, "chat_completion", lambda *a, **kw: _r(None))
+    out = service.call_llm(db_session, "proposal_generation",
+                           [{"role": "user", "content": "hi"}])
+    assert out == ""
+
+
+def test_call_llm_json_none_content_falls_back(db_session, monkeypatch):
+    # None от primary → пробуем fallback, а не падаем
+    _setup(db_session, with_fallback=True)
+
+    def fake(prov, mid, msgs, **kw):
+        return _r(None) if mid == "primary" else _r(json.dumps({"ok": True}))
+
+    monkeypatch.setattr(client, "chat_completion", fake)
+    out = service.call_llm(db_session, "proposal_generation",
+                           [{"role": "user", "content": "hi"}],
+                           json_schema={"type": "object"})
+    assert out == {"ok": True}
+
+
 def test_call_llm_fallback_on_primary_error(db_session, monkeypatch):
     _setup(db_session, with_fallback=True)
 

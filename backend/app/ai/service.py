@@ -75,7 +75,13 @@ def call_llm(
             )
             record_usage(db, provider, model, purpose_key, result)
             content = result["content"]
-            return json.loads(content) if json_mode else content
+            if not json_mode:
+                return content or ""
+            if not isinstance(content, str) or not content.strip():
+                # reasoning-модель могла израсходовать лимит на рассуждения и
+                # вернуть пустой content — пробуем фолбэк, не роняем задачу TypeError'ом
+                raise AIError("пустой ответ модели (возможно, исчерпан лимит токенов)")
+            return json.loads(content)
         except (AIError, json.JSONDecodeError) as exc:
             last_err = exc
             continue

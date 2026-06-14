@@ -24,7 +24,7 @@ def _run_catalog_extract(db, job: Job) -> None:
     job.message = f"обработано 0/{total}"
     db.commit()
     for _ in range(_MAX_BATCHES):
-        r = ch.extract_batch(db, batch=40, supplier_id=supplier_id)
+        r = ch.extract_batch(db, batch=15, supplier_id=supplier_id)
         if r["processed"] == 0:
             break
         job.processed = total - r["remaining"] if total else job.processed + r["processed"]

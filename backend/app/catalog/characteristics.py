@@ -61,7 +61,7 @@ def extract_batch(db: Session, batch: int = 40, supplier_id: int | None = None) 
     )
     result = ai_service.call_llm(
         db, PURPOSE, [{"role": "user", "content": prompt}],
-        json_schema=EXTRACT_SCHEMA, max_tokens=2000,
+        json_schema=EXTRACT_SCHEMA, max_tokens=8000,
     )
     by_id: dict[int, dict] = {}
     if isinstance(result, dict):
