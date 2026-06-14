@@ -88,7 +88,7 @@ export default function EstimateEditorPage() {
       <EstimateHeader key={est.id} estimate={est} clients={clients} canEdit={e.canEdit} onPatch={e.patchEstimate} onCreateClient={handleCreateClient} />
       <EstimateTabs
         smeta={smetaTab}
-        kp={<ProposalTab estimateId={est.id} initial={est.proposal} canEdit={e.canEdit} />}
+        kp={<ProposalTab estimateId={est.id} initial={est.proposal} canEdit={e.canEdit} onSaved={() => void e.reload()} />}
         share={<ShareTab estimateId={est.id} canEdit={e.canEdit} />}
       />
       {e.canEdit && !assistantOpen && (

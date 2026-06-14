@@ -20,11 +20,12 @@ function normalize(b: Partial<ProposalBlocks> | null | undefined): ProposalBlock
 }
 
 export default function ProposalTab({
-  estimateId, initial, canEdit,
+  estimateId, initial, canEdit, onSaved,
 }: {
   estimateId: number;
   initial: ProposalBlocks | null;
   canEdit: boolean;
+  onSaved?: () => void;  // обновить родителя (est.proposal), чтобы не терялось при смене вкладки
 }) {
   const [blocks, setBlocks] = useState<ProposalBlocks>(initial ? normalize(initial) : EMPTY);
   const [hasBlocks, setHasBlocks] = useState<boolean>(initial != null);
@@ -39,6 +40,7 @@ export default function ProposalTab({
     try {
       const out = await generateProposal(estimateId);
       setBlocks(normalize(out)); setHasBlocks(true); setRev((r) => r + 1);
+      onSaved?.();
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) setNotConfigured(true);
       else setError(e instanceof Error ? e.message : "Ошибка генерации");
@@ -52,6 +54,7 @@ export default function ProposalTab({
     try {
       const out = await patchProposal(estimateId, { [key]: value });
       setBlocks(normalize(out)); setHasBlocks(true);
+      onSaved?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     }
@@ -61,7 +64,8 @@ export default function ProposalTab({
     setBlocks((b) => ({ ...b, advantages: items }));
     try {
       const out = await patchProposal(estimateId, { advantages: items });
-      setBlocks(out); setHasBlocks(true);
+      setBlocks(normalize(out)); setHasBlocks(true);
+      onSaved?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     }
