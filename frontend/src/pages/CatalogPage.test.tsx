@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { priceCellText } from "./CatalogPage";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -62,5 +63,17 @@ describe("CatalogPage", () => {
       const calls = fetchMock.mock.calls.map((c) => c[0] as string);
       expect(calls.some((u) => u.includes("/api/catalog/items?") && u.includes("q=%D1%812000"))).toBe(true);
     });
+  });
+});
+
+describe("priceCellText", () => {
+  it("показывает «уточнить» для price_on_request", () => {
+    expect(priceCellText("0.00", true)).toBe("уточнить");
+  });
+  it("показывает цену, когда не on_request", () => {
+    expect(priceCellText("100.00", false)).toBe("100.00");
+  });
+  it("прочерк, когда цены нет", () => {
+    expect(priceCellText(undefined, false)).toBe("—");
   });
 });

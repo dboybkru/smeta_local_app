@@ -14,6 +14,11 @@ import { getJob, startCatalogExtract } from "../api/jobs";
 
 const PAGE_SIZE = 50;
 
+export function priceCellText(value: string | undefined, onRequest: boolean): string {
+  if (onRequest) return "уточнить";
+  return value ?? "—";
+}
+
 export default function CatalogPage() {
   const [levels, setLevels] = useState<PriceLevel[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -201,7 +206,10 @@ export default function CatalogPage() {
             {items.map((it) => (
               <tr key={it.id} className="border-b border-stone-200">
                 <td className="py-2 text-stone-500">{it.article || "—"}</td>
-                <td className="text-stone-900">{it.name}</td>
+                <td className="text-stone-900">
+                  {it.name}
+                  {it.manufacturer && <span className="text-stone-400"> · {it.manufacturer}</span>}
+                </td>
                 <td className="text-stone-500">{supplierName(it.supplier_id)}</td>
                 <td className="text-stone-500">{it.unit}</td>
                 <td className="max-w-xs text-xs text-stone-500">
@@ -213,7 +221,7 @@ export default function CatalogPage() {
                 </td>
                 {levels.map((l) => (
                   <td key={l.id} className="text-right tabular-nums">
-                    {it.prices[String(l.id)] ?? "—"}
+                    {priceCellText(it.prices[String(l.id)], it.price_on_request)}
                   </td>
                 ))}
               </tr>
