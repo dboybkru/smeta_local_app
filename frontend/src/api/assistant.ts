@@ -22,10 +22,14 @@ export type Operation = {
 
 export type ChatResponse = { reply: string; operations: Operation[] };
 
-export function chatAssistant(estimateId: number, messages: ChatMessage[]) {
+export function getAssistantHistory(estimateId: number) {
+  return api<ChatMessage[]>(`/estimates/${estimateId}/assistant/messages`);
+}
+
+export function chatAssistant(estimateId: number, message: string) {
   return api<ChatResponse>(`/estimates/${estimateId}/assistant/chat`, {
     method: "POST",
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ message }),
   });
 }
 

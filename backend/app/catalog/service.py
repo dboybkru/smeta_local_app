@@ -23,15 +23,22 @@ def search_items(
     limit: int = 50,
     offset: int = 0,
     facets: dict[str, str] | None = None,
+    in_characteristics: bool = False,
 ) -> tuple[list[CatalogItem], int]:
     query = select(CatalogItem)
     for token in search.tokens(q):
         # токен matches, если ЛЮБОЙ его раскладочный вариант — подстрока name/article
+        # (а при in_characteristics — ещё и сырья характеристик: для ассистента,
+        # чтобы запрос по спецификации «5мп», «poe» находил позиции)
         variant_clauses = []
         for v in search.variants(token):
             pat = f"%{_escape_like(v)}%"
             variant_clauses.append(func.lower(CatalogItem.name).like(pat, escape="\\"))
             variant_clauses.append(func.lower(CatalogItem.article).like(pat, escape="\\"))
+            if in_characteristics:
+                variant_clauses.append(
+                    func.lower(CatalogItem.characteristics_raw).like(pat, escape="\\")
+                )
         query = query.where(or_(*variant_clauses))
     for key, value in (facets or {}).items():
         query = query.where(CatalogItem.characteristics[key].as_string() == value)

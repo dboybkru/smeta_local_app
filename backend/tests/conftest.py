@@ -19,6 +19,7 @@ from app.publiclinks import models as _publiclink_models  # noqa: E402, F401
 from app.ai import models as _ai_models  # noqa: E402, F401
 from app.jobs import models as _jobs_models  # noqa: E402, F401
 from app.settings import models as _settings_models  # noqa: E402, F401
+from app.assistant import models as _assistant_models  # noqa: E402, F401
 from app.main import app  # noqa: E402
 
 

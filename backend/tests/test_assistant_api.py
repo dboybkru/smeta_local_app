@@ -32,10 +32,14 @@ def test_chat_returns_reply_and_operations(client, db_session, monkeypatch):
     ]
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: calls.pop(0))
     r = client.post(f"/api/estimates/{est.id}/assistant/chat", headers=_hdr(u),
-                    json={"messages": [{"role": "user", "content": "добавь раздел"}]})
+                    json={"message": "добавь раздел"})
     assert r.status_code == 200, r.text
     assert r.json()["reply"] == "ок"
     assert r.json()["operations"][0]["op"] == "add_section"
+    # история сохранена: запрос пользователя + ответ AI
+    hist = client.get(f"/api/estimates/{est.id}/assistant/messages", headers=_hdr(u)).json()
+    assert [m["role"] for m in hist] == ["user", "assistant"]
+    assert hist[0]["content"] == "добавь раздел"
 
 
 def test_apply_mutates_and_returns_detail(client, db_session):
@@ -68,5 +72,8 @@ def test_chat_503_when_ai_not_configured(client, db_session, monkeypatch):
         raise AINotConfigured("не настроен")
     monkeypatch.setattr(ai_service, "call_llm", boom)
     r = client.post(f"/api/estimates/{est.id}/assistant/chat", headers=_hdr(u),
-                    json={"messages": [{"role": "user", "content": "hi"}]})
+                    json={"message": "hi"})
     assert r.status_code == 503
+    # неуспешный вызов AI историю НЕ сохраняет
+    hist = client.get(f"/api/estimates/{est.id}/assistant/messages", headers=_hdr(u)).json()
+    assert hist == []

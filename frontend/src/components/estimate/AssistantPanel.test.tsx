@@ -11,6 +11,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("AssistantPanel", () => {
   it("sends a message, shows reply + changeset, applies it", async () => {
     const f = vi.fn(async (url: string) => {
+      if (url.includes("/assistant/messages")) return json([]);
       if (url.includes("/assistant/chat"))
         return json({ reply: "Добавил раздел", operations: [{ op: "add_section", name: "Обор" }] });
       if (url.includes("/assistant/apply"))
@@ -30,8 +31,29 @@ describe("AssistantPanel", () => {
     expect(applies.length).toBe(1);
   });
 
+  it("грузит сохранённую историю при открытии и шлёт по Enter", async () => {
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/assistant/messages"))
+        return json([{ role: "user", content: "прошлый вопрос" },
+                     { role: "assistant", content: "прошлый ответ" }]);
+      if (url.includes("/assistant/chat")) {
+        expect(JSON.parse(String(init?.body)).message).toBe("новый");
+        return json({ reply: "свежий ответ", operations: [] });
+      }
+      return json({});
+    });
+    vi.stubGlobal("fetch", f);
+    render(<AssistantPanel estimateId={5} onApplied={() => {}} onClose={() => {}} />);
+    expect(await screen.findByText("прошлый ответ")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Сообщение ассистенту"), "новый{Enter}");
+    expect(await screen.findByText("свежий ответ")).toBeInTheDocument();
+  });
+
   it("shows 'AI not configured' on 503", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json({ detail: "не настроен" }, 503)));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/assistant/messages")) return json([]);
+      return json({ detail: "не настроен" }, 503);
+    }));
     render(<AssistantPanel estimateId={1} onApplied={() => {}} onClose={() => {}} />);
     await userEvent.type(screen.getByLabelText("Сообщение ассистенту"), "hi");
     await userEvent.click(screen.getByText("Отправить"));

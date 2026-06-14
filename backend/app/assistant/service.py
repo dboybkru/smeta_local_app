@@ -1,8 +1,10 @@
 from pydantic import TypeAdapter, ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai import service as ai_service
 from app.assistant import schemas
+from app.assistant.models import AssistantMessage
 from app.catalog import service as catalog_service
 from app.catalog.models import CatalogItem
 from app.estimates import models as em
@@ -10,8 +12,23 @@ from app.estimates import service as est_service
 
 _OP_ADAPTER = TypeAdapter(schemas.Operation)
 _MAX_QUERIES = 5
-_MAX_CANDIDATES = 30
+_MAX_CANDIDATES = 40
+_PER_QUERY = 15
 _MAX_TOKENS = 1500
+
+
+def load_history(db: Session, estimate_id: int) -> list[schemas.ChatMessage]:
+    rows = db.scalars(
+        select(AssistantMessage)
+        .where(AssistantMessage.estimate_id == estimate_id)
+        .order_by(AssistantMessage.id)
+    ).all()
+    return [schemas.ChatMessage(role=r.role, content=r.content) for r in rows]
+
+
+def save_message(db: Session, estimate_id: int, role: str, content: str) -> None:
+    db.add(AssistantMessage(estimate_id=estimate_id, role=role, content=content))
+    db.commit()
 
 
 def build_context(estimate: em.Estimate) -> str:
@@ -53,14 +70,17 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
                 seen[it.id] = it
 
     for q in (queries or [])[:_MAX_QUERIES]:
-        items, _ = catalog_service.search_items(db, q=q, limit=8)
+        items, _ = catalog_service.search_items(
+            db, q=q, limit=_PER_QUERY, in_characteristics=True
+        )
         if not items and len(q.split()) > 1:
             # запрос слишком конкретный (характеристики/бренд в названии нет) —
             # переспрашиваем по отдельным значимым словам, чтобы найти категорию
             for word in q.split():
                 if len(word) < 3:
                     continue
-                _add(catalog_service.search_items(db, q=word, limit=8)[0])
+                _add(catalog_service.search_items(
+                    db, q=word, limit=_PER_QUERY, in_characteristics=True)[0])
                 if len(seen) >= _MAX_CANDIDATES:
                     break
         else:

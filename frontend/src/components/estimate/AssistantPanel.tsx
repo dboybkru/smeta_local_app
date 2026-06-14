@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import {
-  applyChangeset, chatAssistant,
+  applyChangeset, chatAssistant, getAssistantHistory,
   type ChatMessage, type Operation,
 } from "../../api/assistant";
 import type { EstimateDetail } from "../../api/estimates";
@@ -35,14 +35,21 @@ export default function AssistantPanel({
   const [notConfigured, setNotConfigured] = useState(false);
   const [error, setError] = useState("");
 
+  // загрузить сохранённую историю диалога этой сметы при открытии
+  useEffect(() => {
+    getAssistantHistory(estimateId)
+      .then(setMessages)
+      .catch(() => undefined);
+  }, [estimateId]);
+
   async function send() {
     const text = draft.trim();
     if (!text || busy) return;
-    const next = [...messages, { role: "user" as const, content: text }];
-    setMessages(next); setDraft(""); setPending([]); setError(""); setNotConfigured(false);
+    setMessages((m) => [...m, { role: "user", content: text }]);
+    setDraft(""); setPending([]); setError(""); setNotConfigured(false);
     setBusy(true);
     try {
-      const out = await chatAssistant(estimateId, next);
+      const out = await chatAssistant(estimateId, text);
       setMessages((m) => [...m, { role: "assistant", content: out.reply }]);
       setPending(out.operations);
     } catch (e) {
@@ -108,8 +115,14 @@ export default function AssistantPanel({
           aria-label="Сообщение ассистенту"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
           rows={2}
-          placeholder="Сообщение…"
+          placeholder="Сообщение… (Enter — отправить, Shift+Enter — перенос)"
           className="mb-2 w-full rounded border border-stone-300 px-2 py-1"
         />
         <button onClick={() => void send()} disabled={busy}

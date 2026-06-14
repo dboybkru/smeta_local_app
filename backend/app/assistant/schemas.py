@@ -11,7 +11,13 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+    # одно новое сообщение пользователя; история берётся из БД по смете
+    message: str = Field(min_length=1)
+
+
+class AssistantMessageOut(BaseModel):
+    role: str
+    content: str
 
 
 # --- операции changeset ---
