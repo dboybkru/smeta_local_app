@@ -62,10 +62,16 @@ def extract_batch(db: Session, batch: int = 40, supplier_id: int | None = None) 
     by_id: dict[int, dict] = {}
     if isinstance(result, dict):
         for row in result.get("items", []) or []:
-            if isinstance(row, dict) and "id" in row:
-                chars = row.get("characteristics")
-                if isinstance(chars, dict):
-                    by_id[int(row["id"])] = {str(k): str(v) for k, v in chars.items()}
+            if not isinstance(row, dict) or "id" not in row:
+                continue
+            chars = row.get("characteristics")
+            if not isinstance(chars, dict):
+                continue
+            try:
+                rid = int(row["id"])
+            except (ValueError, TypeError):
+                continue  # битый id от LLM — пропускаем (позиция получит {})
+            by_id[rid] = {str(k): str(v) for k, v in chars.items()}
     for it in items:
         it.characteristics = by_id.get(it.id, {})
     db.commit()
