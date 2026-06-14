@@ -6,12 +6,32 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- clients ---
-class ClientIn(BaseModel):
+class _ClientFields(BaseModel):
+    inn: str | None = None
+    kpp: str | None = None
+    ogrn: str | None = None
+    type: str | None = None
+    address: str | None = None
+    actual_address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    contact_person: str | None = None
+    bank_name: str | None = None
+    bank_account: str | None = None
+    bik: str | None = None
+
+
+class ClientIn(_ClientFields):
     name: str = Field(min_length=1, max_length=255)
     default_price_level_id: int | None = None
 
 
-class ClientOut(BaseModel):
+class ClientPatch(_ClientFields):
+    name: str | None = Field(default=None, max_length=255)
+    default_price_level_id: int | None = None
+
+
+class ClientOut(_ClientFields):
     model_config = ConfigDict(from_attributes=True)
 
     id: int

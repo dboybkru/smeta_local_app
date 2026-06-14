@@ -30,7 +30,7 @@ def create_client(
 ):
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
-    client = models.Client(name=body.name, default_price_level_id=body.default_price_level_id)
+    client = models.Client(**body.model_dump())
     db.add(client)
     db.commit()
     db.refresh(client)
@@ -43,6 +43,32 @@ def suggest_clients(q: str = "", db: Session = Depends(get_db)):
     if not token:
         return []
     return dadata.suggest_parties(token, q)
+
+
+@router.get("/clients/{client_id}", response_model=schemas.ClientOut,
+            dependencies=[Depends(require_active)])
+def get_client(client_id: int, db: Session = Depends(get_db)):
+    client = db.get(models.Client, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    return client
+
+
+@router.patch("/clients/{client_id}", response_model=schemas.ClientOut)
+def update_client(
+    client_id: int, body: schemas.ClientPatch,
+    db: Session = Depends(get_db), user: User = Depends(require_active),
+):
+    if user.role == "viewer":
+        raise HTTPException(status_code=403, detail="Просмотр без права изменения")
+    client = db.get(models.Client, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(client, field, value)
+    db.commit()
+    db.refresh(client)
+    return client
 
 
 @router.get("/estimates", response_model=list[schemas.EstimateOut])

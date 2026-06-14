@@ -16,6 +16,18 @@ class Client(Base):
     default_price_level_id: Mapped[int | None] = mapped_column(
         ForeignKey("price_levels.id"), nullable=True
     )
+    inn: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    kpp: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ogrn: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    actual_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    contact_person: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bank_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    bank_account: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    bik: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
