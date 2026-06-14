@@ -55,7 +55,7 @@ describe("catalog api", () => {
       supplier_id: 2,
       kind: "material",
       sheets: ["Лист1"],
-      mapping: { name_col: 1, article_col: 0, unit_col: null, category_col: null, price_cols: { 1: 4 } },
+      mapping: { name_col: 1, article_col: 0, unit_col: null, category_col: null, characteristics_col: null, price_cols: { 1: 4 } },
       use_sheet_as_category: false,
       save_mapping: true,
     });

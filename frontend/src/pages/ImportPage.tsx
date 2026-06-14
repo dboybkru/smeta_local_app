@@ -19,7 +19,8 @@ import { ApiError } from "../api/client";
 type Step = "upload" | "map" | "result";
 
 const EMPTY_MAPPING: ColumnMapping = {
-  name_col: 0, article_col: null, unit_col: null, category_col: null, price_cols: {},
+  name_col: 0, article_col: null, unit_col: null, category_col: null,
+  characteristics_col: null, price_cols: {},
 };
 
 export default function ImportPage() {

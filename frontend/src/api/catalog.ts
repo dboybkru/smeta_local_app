@@ -7,6 +7,7 @@ export type ColumnMapping = {
   article_col: number | null;
   unit_col: number | null;
   category_col: number | null;
+  characteristics_col: number | null;
   price_cols: Record<number, number>; // price_level_id -> column index
 };
 
@@ -97,6 +98,7 @@ export type ItemFilters = {
   kind?: string;
   limit?: number;
   offset?: number;
+  facets?: Record<string, string>;
 };
 export const listItems = (f: ItemFilters = {}) => {
   const params = new URLSearchParams();
@@ -105,7 +107,16 @@ export const listItems = (f: ItemFilters = {}) => {
   if (f.kind) params.set("kind", f.kind);
   if (f.limit != null) params.set("limit", String(f.limit));
   if (f.offset != null) params.set("offset", String(f.offset));
+  for (const [k, v] of Object.entries(f.facets ?? {})) params.append("f", `${k}=${v}`);
   return api<ItemsPage>(`/catalog/items?${params.toString()}`);
+};
+
+export const getFacets = (supplierId?: number, kind?: string) => {
+  const p = new URLSearchParams();
+  if (supplierId != null) p.set("supplier_id", String(supplierId));
+  if (kind) p.set("kind", kind);
+  const qs = p.toString();
+  return api<Record<string, string[]>>(`/catalog/facets${qs ? `?${qs}` : ""}`);
 };
 
 export const extractCharacteristics = (supplierId?: number, batch = 40) => {

@@ -14,7 +14,8 @@ const COLUMNS = [
 const LEVELS = [{ id: 1, name: "Розница", sort_order: 0 }];
 
 const EMPTY: ColumnMapping = {
-  name_col: 1, article_col: null, unit_col: null, category_col: null, price_cols: {},
+  name_col: 1, article_col: null, unit_col: null, category_col: null,
+  characteristics_col: null, price_cols: {},
 };
 
 describe("ColumnMapper", () => {
