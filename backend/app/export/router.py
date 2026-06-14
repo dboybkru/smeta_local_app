@@ -22,7 +22,7 @@ def export_xlsx(
     user: User = Depends(require_active),
 ):
     est = est_service.get_owned_estimate(db, estimate_id, user)
-    context = ctx.build_export_context(est, level=level, public=False)
+    context = ctx.build_export_context(est, level=level, public=False, db=db)
     data = render_xlsx(context)
     return Response(
         content=data,
@@ -39,7 +39,7 @@ def export_pdf(
     user: User = Depends(require_active),
 ):
     est = est_service.get_owned_estimate(db, estimate_id, user)
-    context = ctx.build_export_context(est, level=level, public=False)
+    context = ctx.build_export_context(est, level=level, public=False, db=db)
     html = render.render_html(context)
     pdf = render.html_to_pdf(html)
     return Response(

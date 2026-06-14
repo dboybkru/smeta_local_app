@@ -50,6 +50,31 @@ def test_private_context_keeps_margin(db_session):
             assert "purchase_price_snapshot" in line
 
 
+def test_export_includes_catalog_characteristics(db_session):
+    from app.catalog.models import CatalogItem, Supplier
+    u = User(email="c@x.ru", name="U", role="estimator", status="active")
+    db_session.add(u); db_session.commit()
+    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
+    item = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт",
+                       kind="material", characteristics={"Разрешение": "2 Мп"})
+    db_session.add(item); db_session.commit()
+    est = Estimate(owner_id=u.id, object_name="Объект")
+    branch = EstimateBranch(name="Базовая")
+    section = EstimateSection(name="Обор", markup_percent=0)
+    section.lines.append(EstimateLine(item_id=item.id, name="Камера", unit="шт",
+                                      qty=1, work_price=0, material_price=100))
+    branch.sections.append(section); est.branches.append(branch)
+    db_session.add(est); db_session.commit(); db_session.refresh(est)
+
+    context = ctx.build_export_context(est, level="full", public=True, db=db_session)
+    line = context["sections"][0]["lines"][0]
+    assert line["characteristics"] == {"Разрешение": "2 Мп"}
+    data = render_xlsx(context)
+    wb = load_workbook(io.BytesIO(data))
+    text = "\n".join(str(c.value) for row in wb.active.iter_rows() for c in row if c.value)
+    assert "Разрешение" in text
+
+
 def test_render_xlsx_is_valid_workbook(db_session):
     est = _estimate(db_session)
     context = ctx.build_export_context(est, level="estimate", public=False)

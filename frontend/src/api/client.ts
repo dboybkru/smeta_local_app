@@ -30,7 +30,7 @@ async function rawRequest(path: string, options: RequestInit = {}) {
 }
 
 // TODO(v2): общий refresh-promise, чтобы параллельные 401 не гонялись за refresh
-async function tryRefresh(): Promise<boolean> {
+export async function tryRefresh(): Promise<boolean> {
   const { refresh } = getTokens();
   if (!refresh) return false;
   const resp = await fetch(`${BASE}/auth/refresh`, {

@@ -39,7 +39,11 @@ def render_xlsx(context: dict) -> bytes:
         for ln in section["lines"]:
             mat = _num(ln["material_price"]) * _num(ln["qty"])
             work = _num(ln["work_price"]) * _num(ln["qty"])
-            ws.cell(row=row, column=1, value=ln["name"])
+            name = ln["name"]
+            chars = ln.get("characteristics")
+            if chars:
+                name += " (" + "; ".join(f"{k}: {v}" for k, v in chars.items()) + ")"
+            ws.cell(row=row, column=1, value=name)
             ws.cell(row=row, column=2, value=ln["unit"])
             ws.cell(row=row, column=3, value=_num(ln["qty"]))
             ws.cell(row=row, column=4, value=mat)

@@ -16,7 +16,7 @@ def _context_for_link(db: Session, token: str) -> tuple[dict, str]:
     est = db.get(est_models.Estimate, link.estimate_id)
     if est is None:
         raise HTTPException(status_code=404, detail="Смета не найдена")
-    context = ctx.build_export_context(est, level=link.level, public=True)
+    context = ctx.build_export_context(est, level=link.level, public=True, db=db)
     watermark = link.watermark_text if link.watermark_enabled else ""
     return context, watermark
 

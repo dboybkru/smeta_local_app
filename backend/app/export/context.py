@@ -1,16 +1,41 @@
 """Единый контекст для Excel/HTML/PDF. Для public режет закупку и маржу."""
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.catalog.models import CatalogItem
 from app.estimates import models, service
 
 LEVELS = ("full", "cover", "estimate")
 
 
+def _characteristics_map(db: Session | None, est: models.Estimate) -> dict[int, dict]:
+    """item_id → characteristics для позиций сметы (для показа в КП/экспорте)."""
+    if db is None:
+        return {}
+    ids = {
+        ln.item_id
+        for branch in est.branches
+        for section in branch.sections
+        for ln in section.lines
+        if ln.item_id is not None
+    }
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(CatalogItem.id, CatalogItem.characteristics).where(CatalogItem.id.in_(ids))
+    ).all()
+    return {cid: chars for cid, chars in rows if chars}
+
+
 def build_export_context(
-    est: models.Estimate, *, level: str = "full", public: bool = False
+    est: models.Estimate, *, level: str = "full", public: bool = False,
+    db: Session | None = None,
 ) -> dict:
     if level not in LEVELS:
         level = "full"
     totals = service.compute_totals(est)
     totals_by_section = {s["section_id"]: s for s in totals["sections"]}
+    chars_map = _characteristics_map(db, est)
 
     sections_out = []
     for branch in est.branches:
@@ -24,6 +49,7 @@ def build_export_context(
                     "qty": ln.qty,
                     "work_price": ln.work_price,
                     "material_price": ln.material_price,
+                    "characteristics": chars_map.get(ln.item_id) if ln.item_id else None,
                 }
                 if not public:
                     line["purchase_price_snapshot"] = ln.purchase_price_snapshot
