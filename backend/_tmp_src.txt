@@ -1,0 +1,13 @@
+def _build_row(row, mapping, name, current_category, default_category, prices,
+               on_request) -> ParsedRow:
+    category = (current_category or _cell(row, mapping.category_col) or default_category)
+    return ParsedRow(
+        name=name,
+        article=_cell(row, mapping.article_col),
+        unit=_clean_unit(_cell(row, mapping.unit_col)),
+        category=category,
+        characteristics=_cell(row, mapping.characteristics_col),
+        manufacturer=_cell(row, mapping.manufacturer_col),
+        price_on_request=on_request,
+        prices=prices,
+    )

@@ -16,7 +16,7 @@ export default function CatalogSearchInput({ onPick }: Props) {
       return;
     }
     const handle = setTimeout(() => {
-      listItems({ q, limit: 8 })
+      listItems({ q, limit: 30 })
         .then((page) => {
           setResults(page.items);
           setOpen(true);
@@ -48,7 +48,7 @@ export default function CatalogSearchInput({ onPick }: Props) {
         className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
       />
       {open && results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded border border-stone-300 bg-white shadow-lg">
+        <div className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto overscroll-contain rounded border border-stone-300 bg-white shadow-lg">
           {results.map((it) => (
             <button
               key={it.id}

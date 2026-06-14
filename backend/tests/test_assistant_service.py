@@ -152,6 +152,18 @@ def test_candidates_include_characteristics(db_session):
     assert "Разрешение" in text
 
 
+def test_candidates_per_word_fallback_for_overspecified_query(db_session):
+    # многословный запрос с характеристиками не совпадёт по названию целиком,
+    # но переспрос по словам должен найти позицию по слову «камера»
+    from app.catalog.models import CatalogItem, Supplier
+    sup = Supplier(name="P2"); db_session.add(sup); db_session.commit()
+    it = CatalogItem(supplier_id=sup.id, name="Видеокамера Optimus IP-E014", article="B",
+                     unit="шт", kind="material")
+    db_session.add(it); db_session.commit()
+    text, items = asvc._candidates(db_session, ["камера уличная 4мп с ик подсветкой"])
+    assert any(i.id == it.id for i in items)
+
+
 def test_apply_changeset_atomic_rollback_on_bad_ref(db_session):
     from app.estimates import models as em
     est, item = _estimate_with_catalog(db_session)

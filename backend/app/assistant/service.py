@@ -46,15 +46,28 @@ def build_context(estimate: em.Estimate) -> str:
 
 def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]]:
     seen: dict[int, CatalogItem] = {}
+
+    def _add(found: list[CatalogItem]) -> None:
+        for it in found:
+            if it.id not in seen:
+                seen[it.id] = it
+
     for q in (queries or [])[:_MAX_QUERIES]:
         items, _ = catalog_service.search_items(db, q=q, limit=8)
-        for it in items:
-            seen[it.id] = it
-            if len(seen) >= _MAX_CANDIDATES:
-                break
+        if not items and len(q.split()) > 1:
+            # запрос слишком конкретный (характеристики/бренд в названии нет) —
+            # переспрашиваем по отдельным значимым словам, чтобы найти категорию
+            for word in q.split():
+                if len(word) < 3:
+                    continue
+                _add(catalog_service.search_items(db, q=word, limit=8)[0])
+                if len(seen) >= _MAX_CANDIDATES:
+                    break
+        else:
+            _add(items)
         if len(seen) >= _MAX_CANDIDATES:
             break
-    items = list(seen.values())
+    items = list(seen.values())[:_MAX_CANDIDATES]
     if not items:
         return "(каталог: подходящих позиций не найдено)", items
     rows = []
@@ -94,9 +107,14 @@ def run_assistant(
     # Шаг 1 — поисковые термины
     search_prompt = (
         "Ты помощник по сметам. По последнему сообщению пользователя и смете предложи "
-        "до 5 коротких поисковых запросов по каталогу материалов/работ, которые помогут "
-        "выполнить просьбу. Если каталог не нужен (вопрос/правка существующего) — "
-        "пустой список.\n\n"
+        "до 5 КОРОТКИХ поисковых запросов по каталогу (1-2 слова: тип/категория позиции — "
+        "например «камера», «видеокамера», «видеорегистратор», «кабель», «блок питания», "
+        "«монтаж»). НЕ включай в запросы характеристики, бренды, модели и артикулы — "
+        "только общее название типа, иначе поиск по названию ничего не найдёт. "
+        "Если пользователь просит ДОБАВИТЬ, ПОДОБРАТЬ или ПОСОВЕТОВАТЬ оборудование/"
+        "материалы — ОБЯЗАТЕЛЬНО верни запросы (НЕ пустой список). "
+        "Пустой список — только если каталог не нужен (правка/вопрос по уже имеющимся "
+        "строкам сметы).\n\n"
         f"СМЕТА:\n{context}"
     )
     step1 = ai_service.call_llm(
