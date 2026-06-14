@@ -8,13 +8,36 @@ export type ColumnMapping = {
   unit_col: number | null;
   category_col: number | null;
   characteristics_col: number | null;
+  manufacturer_col?: number | null;
+  header_row?: number;
+  data_start_row?: number | null;
   price_cols: Record<number, number>; // price_level_id -> column index
+  on_request_cols?: number[];
+};
+
+export type PriceColumn = {
+  index: number;
+  label: string;
+  sample: string;
+  on_request: boolean;
+};
+
+export type DetectedLayout = {
+  header_row: number;
+  data_start_row: number;
+  name_col: number | null;
+  article_col: number | null;
+  chars_col: number | null;
+  unit_col: number | null;
+  manufacturer_col: number | null;
+  price_columns: PriceColumn[];
+  confidence: number;
 };
 
 export type Supplier = { id: number; name: string; column_mapping_template: ColumnMapping | null };
 
 export type Column = { index: number; header: string; samples: string[] };
-export type Sheet = { name: string; row_count: number; header_row: number; columns: Column[] };
+export type Sheet = { name: string; row_count: number; header_row: number; columns: Column[]; detected: DetectedLayout | null };
 export type InspectResult = { sheets: Sheet[] };
 
 export type ImportSummary = {
@@ -36,6 +59,8 @@ export type CatalogItem = {
   unit: string;
   category: string;
   kind: string;
+  manufacturer: string | null;
+  price_on_request: boolean;
   prices: Record<string, string>; // level_id (string) -> decimal string
   characteristics: Record<string, string> | null;
 };
@@ -70,12 +95,13 @@ export const inspectFile = (file: File) => {
   return apiUpload<InspectResult>("/catalog/inspect", form);
 };
 
+export type ImportSheetMapping = { name: string; mapping: ColumnMapping };
+
 export type ImportParams = {
   file: File;
   supplier_id: number;
   kind: "material" | "work";
-  sheets: string[];
-  mapping: ColumnMapping;
+  sheet_mappings: ImportSheetMapping[];
   use_sheet_as_category: boolean;
   save_mapping: boolean;
 };
@@ -84,8 +110,7 @@ export const importFile = (p: ImportParams) => {
   form.append("file", p.file);
   form.append("supplier_id", String(p.supplier_id));
   form.append("kind", p.kind);
-  form.append("sheets", JSON.stringify(p.sheets));
-  form.append("mapping", JSON.stringify(p.mapping));
+  form.append("sheet_mappings", JSON.stringify(p.sheet_mappings));
   form.append("use_sheet_as_category", String(p.use_sheet_as_category));
   form.append("save_mapping", String(p.save_mapping));
   return apiUpload<ImportSummary>("/catalog/import", form);
