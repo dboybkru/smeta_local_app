@@ -223,6 +223,8 @@ def import_parsed(
                 unit=row.unit,
                 category=row.category,
                 kind=kind,
+                manufacturer=row.manufacturer or None,
+                price_on_request=row.price_on_request,
                 characteristics_raw=row.characteristics or None,
             )
             db.add(item)
@@ -231,6 +233,8 @@ def import_parsed(
         else:
             item.unit = row.unit
             item.category = row.category or item.category
+            item.manufacturer = row.manufacturer or item.manufacturer
+            item.price_on_request = row.price_on_request
             if row.characteristics and row.characteristics != item.characteristics_raw:
                 item.characteristics_raw = row.characteristics
                 item.characteristics = None  # сырьё изменилось → переизвлечь признаки
