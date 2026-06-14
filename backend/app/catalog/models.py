@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -75,7 +76,7 @@ class CatalogItem(Base):
     )
     characteristics_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    price_on_request: Mapped[bool] = mapped_column(default=False)
+    price_on_request: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ItemPrice(Base):
