@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -73,10 +73,15 @@ class SetVat(BaseModel):
 
 
 Operation = Annotated[
-    Union[
-        AddSection, AddCatalogLine, AddCustomLine, SetQty, SetPrice,
-        DeleteLine, DeleteSection, SetSectionMarkup, SetVat,
-    ],
+    AddSection
+    | AddCatalogLine
+    | AddCustomLine
+    | SetQty
+    | SetPrice
+    | DeleteLine
+    | DeleteSection
+    | SetSectionMarkup
+    | SetVat,
     Field(discriminator="op"),
 ]
 

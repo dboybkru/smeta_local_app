@@ -69,3 +69,54 @@ def test_run_assistant_skips_invalid_ops(db_session, monkeypatch):
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: calls.pop(0))
     out = asvc.run_assistant(db_session, est, [schemas.ChatMessage(role="user", content="hi")])
     assert len(out.operations) == 1
+
+
+def test_apply_changeset_add_section_and_catalog_line(db_session):
+    est, item = _estimate_with_catalog(db_session)
+    ops = [
+        schemas.AddSection(op="add_section", name="Оборудование"),
+        schemas.AddCatalogLine(op="add_catalog_line", section_name="Оборудование",
+                               catalog_item_id=item.id, qty=Decimal("3")),
+    ]
+    asvc.apply_changeset(db_session, est, ops)
+    db_session.refresh(est)
+    branch = est.branches[0]
+    assert len(branch.sections) == 1
+    sec = branch.sections[0]
+    assert sec.name == "Оборудование"
+    assert len(sec.lines) == 1
+    assert sec.lines[0].qty == Decimal("3")
+    assert sec.lines[0].item_id == item.id
+
+
+def test_apply_changeset_set_qty_and_delete(db_session):
+    from app.estimates import models as em
+    est, item = _estimate_with_catalog(db_session)
+    sec = em.EstimateSection(branch_id=est.branches[0].id, name="С", sort_order=0)
+    db_session.add(sec); db_session.commit()
+    ln = em.EstimateLine(section_id=sec.id, name="X", unit="шт", qty=Decimal("1"))
+    db_session.add(ln); db_session.commit()
+    asvc.apply_changeset(db_session, est, [
+        schemas.SetQty(op="set_qty", line_id=ln.id, qty=Decimal("5")),
+    ])
+    db_session.refresh(ln)
+    assert ln.qty == Decimal("5")
+    asvc.apply_changeset(db_session, est, [
+        schemas.DeleteLine(op="delete_line", line_id=ln.id),
+    ])
+    db_session.refresh(sec)
+    assert len(sec.lines) == 0
+
+
+def test_apply_changeset_atomic_rollback_on_bad_ref(db_session):
+    from app.estimates import models as em
+    est, item = _estimate_with_catalog(db_session)
+    # add_section валиден, set_qty на чужой line_id (999) — должно откатить ВЕСЬ пакет
+    with pytest.raises(Exception):
+        asvc.apply_changeset(db_session, est, [
+            schemas.AddSection(op="add_section", name="Новый"),
+            schemas.SetQty(op="set_qty", line_id=999, qty=Decimal("2")),
+        ])
+    db_session.rollback()
+    db_session.refresh(est)
+    assert len(est.branches[0].sections) == 0  # раздел не создан (откат)

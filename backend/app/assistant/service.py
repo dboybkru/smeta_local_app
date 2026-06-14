@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
@@ -75,7 +73,8 @@ def run_assistant(
     search_prompt = (
         "Ты помощник по сметам. По последнему сообщению пользователя и смете предложи "
         "до 5 коротких поисковых запросов по каталогу материалов/работ, которые помогут "
-        "выполнить просьбу. Если каталог не нужен (вопрос/правка существующего) — пустой список.\n\n"
+        "выполнить просьбу. Если каталог не нужен (вопрос/правка существующего) — "
+        "пустой список.\n\n"
         f"СМЕТА:\n{context}"
     )
     step1 = ai_service.call_llm(
@@ -97,8 +96,10 @@ def run_assistant(
         "delete_line{line_id}; delete_section{section_id}; "
         "set_section_markup{section_id, markup_percent}; set_vat{vat_enabled, vat_rate?}.\n"
         "Правила: ссылайся ТОЛЬКО на реальные id из СМЕТЫ и КАНДИДАТОВ. Раздел указывай по имени "
-        "(section_name) — можешь создать раздел add_section и в том же пакете добавлять в него строки. "
-        "Если изменения не нужны — пустой operations. В reply кратко по-русски опиши, что предлагаешь.\n\n"
+        "(section_name) — можешь создать раздел add_section и в том же пакете добавлять "
+        "в него строки. "
+        "Если изменения не нужны — пустой operations. В reply кратко по-русски опиши, "
+        "что предлагаешь.\n\n"
         f"СМЕТА:\n{context}\n\n{cand_text}"
     )
     step2 = ai_service.call_llm(
@@ -109,3 +110,93 @@ def run_assistant(
     reply = step2.get("reply", "") if isinstance(step2, dict) else ""
     operations = _parse_ops(step2.get("operations") if isinstance(step2, dict) else None)
     return schemas.ChatResponse(reply=reply, operations=operations)
+
+
+class ApplyError(Exception):
+    pass
+
+
+def _line_in(estimate: em.Estimate, line_id: int) -> em.EstimateLine:
+    for br in estimate.branches:
+        for s in br.sections:
+            for ln in s.lines:
+                if ln.id == line_id:
+                    return ln
+    raise ApplyError(f"Строка #{line_id} не принадлежит смете")
+
+
+def _section_in(estimate: em.Estimate, section_id: int) -> em.EstimateSection:
+    for br in estimate.branches:
+        for s in br.sections:
+            if s.id == section_id:
+                return s
+    raise ApplyError(f"Раздел #{section_id} не принадлежит смете")
+
+
+def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> None:
+    """Атомарно применяет операции к смете. При любой ошибке — откат всего пакета."""
+    branch = est_service.base_branch(estimate)
+    client = db.get(em.Client, estimate.client_id) if estimate.client_id else None
+    # карта имя→раздел: существующие + созданные в этом пакете
+    by_name: dict[str, em.EstimateSection] = {s.name: s for s in branch.sections}
+    section_order = len(branch.sections)
+    try:
+        # 1) создать новые разделы первыми
+        for op in operations:
+            if isinstance(op, schemas.AddSection):
+                sec = em.EstimateSection(
+                    branch_id=branch.id, name=op.name, sort_order=section_order
+                )
+                section_order += 1
+                db.add(sec)
+                by_name[op.name] = sec
+        db.flush()  # назначить id новым разделам (autoflush=False)
+
+        # 2) остальные операции
+        for op in operations:
+            if isinstance(op, schemas.AddSection):
+                continue
+            if isinstance(op, schemas.AddCatalogLine):
+                sec = by_name.get(op.section_name)
+                if sec is None:
+                    raise ApplyError(f"Раздел «{op.section_name}» не найден")
+                item = db.get(CatalogItem, op.catalog_item_id)
+                if item is None:
+                    raise ApplyError(f"Позиция каталога #{op.catalog_item_id} не найдена")
+                work, material, purchase = est_service.snapshot_line_values(db, item, client)
+                db.add(em.EstimateLine(
+                    section_id=sec.id, item_id=item.id, name=item.name, unit=item.unit,
+                    qty=op.qty, work_price=work, material_price=material,
+                    purchase_price_snapshot=purchase, sort_order=len(sec.lines),
+                ))
+            elif isinstance(op, schemas.AddCustomLine):
+                sec = by_name.get(op.section_name)
+                if sec is None:
+                    raise ApplyError(f"Раздел «{op.section_name}» не найден")
+                db.add(em.EstimateLine(
+                    section_id=sec.id, name=op.name, unit=op.unit, qty=op.qty,
+                    work_price=op.work_price, material_price=op.material_price,
+                    sort_order=len(sec.lines),
+                ))
+            elif isinstance(op, schemas.SetQty):
+                _line_in(estimate, op.line_id).qty = op.qty
+            elif isinstance(op, schemas.SetPrice):
+                ln = _line_in(estimate, op.line_id)
+                if op.material_price is not None:
+                    ln.material_price = op.material_price
+                if op.work_price is not None:
+                    ln.work_price = op.work_price
+            elif isinstance(op, schemas.DeleteLine):
+                db.delete(_line_in(estimate, op.line_id))
+            elif isinstance(op, schemas.DeleteSection):
+                db.delete(_section_in(estimate, op.section_id))
+            elif isinstance(op, schemas.SetSectionMarkup):
+                _section_in(estimate, op.section_id).markup_percent = op.markup_percent
+            elif isinstance(op, schemas.SetVat):
+                estimate.vat_enabled = op.vat_enabled
+                if op.vat_rate is not None:
+                    estimate.vat_rate = op.vat_rate
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
