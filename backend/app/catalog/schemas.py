@@ -10,6 +10,7 @@ class ColumnMapping(BaseModel):
     article_col: int | None = None
     unit_col: int | None = None
     category_col: int | None = None
+    characteristics_col: int | None = None
     price_cols: dict[int, int] = Field(default_factory=dict)
 
 

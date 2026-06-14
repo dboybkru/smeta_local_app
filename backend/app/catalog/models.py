@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -72,6 +73,7 @@ class CatalogItem(Base):
     characteristics: Mapped[dict | None] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"), nullable=True
     )
+    characteristics_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ItemPrice(Base):

@@ -17,6 +17,7 @@ class ParsedRow:
     article: str = ""
     unit: str = "шт"
     category: str = ""
+    characteristics: str = ""
     prices: dict[int, Decimal] = field(default_factory=dict)
     problems: list[str] = field(default_factory=list)
 
@@ -64,6 +65,7 @@ def parse_rows(
             article=_cell(row, mapping.article_col),
             unit=_cell(row, mapping.unit_col) or "шт",
             category=_cell(row, mapping.category_col) or default_category,
+            characteristics=_cell(row, mapping.characteristics_col),
         )
         for level_id, col in mapping.price_cols.items():
             raw = _cell(row, col)
@@ -153,6 +155,7 @@ def import_parsed(
                 unit=row.unit,
                 category=row.category,
                 kind=kind,
+                characteristics_raw=row.characteristics or None,
             )
             db.add(item)
             db.flush()
@@ -160,6 +163,9 @@ def import_parsed(
         else:
             item.unit = row.unit
             item.category = row.category or item.category
+            if row.characteristics and row.characteristics != item.characteristics_raw:
+                item.characteristics_raw = row.characteristics
+                item.characteristics = None  # сырьё изменилось → переизвлечь признаки
             summary.items_updated += 1
         for level_id, value in row.prices.items():
             db.add(
