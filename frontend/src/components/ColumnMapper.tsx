@@ -22,7 +22,7 @@ export default function ColumnMapper({ columns, levels, mapping, onChange }: Pro
     </>
   );
 
-  function setField(field: "name_col" | "article_col" | "unit_col" | "category_col", value: string) {
+  function setField(field: "name_col" | "article_col" | "unit_col" | "category_col" | "characteristics_col", value: string) {
     const col = parseCol(value);
     // name_col is required — fall back to the first column if cleared.
     onChange({ ...mapping, [field]: field === "name_col" ? (col ?? 0) : col });
@@ -80,6 +80,17 @@ export default function ColumnMapper({ columns, levels, mapping, onChange }: Pro
             aria-label="Категория"
             value={mapping.category_col ?? ""}
             onChange={(e) => setField("category_col", e.target.value)}
+            className="w-full rounded border border-stone-300 px-2 py-1"
+          >
+            {options}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-stone-600">Характеристики</span>
+          <select
+            aria-label="Характеристики"
+            value={mapping.characteristics_col ?? ""}
+            onChange={(e) => setField("characteristics_col", e.target.value)}
             className="w-full rounded border border-stone-300 px-2 py-1"
           >
             {options}
