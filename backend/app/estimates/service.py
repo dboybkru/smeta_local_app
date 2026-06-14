@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.catalog.models import CatalogItem, PriceLevel
 from app.catalog.service import latest_prices_for
-from app.estimates import models
+from app.estimates import models, schemas
 
 
 def visible_estimates(db: Session, user: User):
@@ -149,3 +149,23 @@ def snapshot_line_values(
     if item.kind == "work":
         return sell, Decimal("0"), purchase
     return Decimal("0"), sell, purchase
+
+
+def build_estimate_detail(est: models.Estimate, user: User) -> "schemas.EstimateDetail":
+    """Деталь сметы с роле-зависимым сокрытием маржи/закупки (общий код для get/apply)."""
+    can_see_margin = user.role == "admin" or est.owner_id == user.id
+    totals = compute_totals(est)
+    if not can_see_margin:
+        for s in totals["sections"]:
+            s["purchase"] = None
+            s["margin"] = None
+        totals["purchase"] = None
+        totals["margin"] = None
+    detail = schemas.EstimateDetail.model_validate(est)
+    detail.totals = schemas.EstimateTotals(**totals)
+    if not can_see_margin:
+        for branch in detail.branches:
+            for section in branch.sections:
+                for line in section.lines:
+                    line.purchase_price_snapshot = None
+    return detail

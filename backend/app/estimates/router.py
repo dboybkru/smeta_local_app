@@ -67,24 +67,7 @@ def get_estimate(
     estimate_id: int, db: Session = Depends(get_db), user: User = Depends(require_active)
 ):
     est = service.get_owned_estimate(db, estimate_id, user)
-    can_see_margin = user.role == "admin" or est.owner_id == user.id
-
-    totals = service.compute_totals(est)
-    if not can_see_margin:
-        for s in totals["sections"]:
-            s["purchase"] = None
-            s["margin"] = None
-        totals["purchase"] = None
-        totals["margin"] = None
-
-    detail = schemas.EstimateDetail.model_validate(est)
-    detail.totals = schemas.EstimateTotals(**totals)
-    if not can_see_margin:
-        for branch in detail.branches:
-            for section in branch.sections:
-                for line in section.lines:
-                    line.purchase_price_snapshot = None
-    return detail
+    return service.build_estimate_detail(est, user)
 
 
 @router.patch("/estimates/{estimate_id}", response_model=schemas.EstimateOut)
