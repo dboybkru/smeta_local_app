@@ -1,0 +1,14 @@
+{
+  "name": "SmetaApp — сметы и КП",
+  "short_name": "SmetaApp",
+  "description": "Сметы и коммерческие предложения",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#1c1917",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
