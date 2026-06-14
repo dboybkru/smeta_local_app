@@ -152,6 +152,16 @@ def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> Non
                 by_name[op.name] = sec
         db.flush()  # назначить id новым разделам (autoflush=False)
 
+        # счётчик sort_order по разделам: collection sec.lines не обновляется до flush
+        # при autoflush=False, поэтому len(sec.lines) дал бы одинаковый порядок всем
+        # строкам пакета — ведём собственный счётчик, засеянный текущим числом строк.
+        line_order: dict[int, int] = {}
+
+        def _next_order(sec: em.EstimateSection) -> int:
+            n = line_order.get(sec.id, len(sec.lines))
+            line_order[sec.id] = n + 1
+            return n
+
         # 2) остальные операции
         for op in operations:
             if isinstance(op, schemas.AddSection):
@@ -167,7 +177,7 @@ def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> Non
                 db.add(em.EstimateLine(
                     section_id=sec.id, item_id=item.id, name=item.name, unit=item.unit,
                     qty=op.qty, work_price=work, material_price=material,
-                    purchase_price_snapshot=purchase, sort_order=len(sec.lines),
+                    purchase_price_snapshot=purchase, sort_order=_next_order(sec),
                 ))
             elif isinstance(op, schemas.AddCustomLine):
                 sec = by_name.get(op.section_name)
@@ -176,7 +186,7 @@ def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> Non
                 db.add(em.EstimateLine(
                     section_id=sec.id, name=op.name, unit=op.unit, qty=op.qty,
                     work_price=op.work_price, material_price=op.material_price,
-                    sort_order=len(sec.lines),
+                    sort_order=_next_order(sec),
                 ))
             elif isinstance(op, schemas.SetQty):
                 _line_in(estimate, op.line_id).qty = op.qty

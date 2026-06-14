@@ -89,6 +89,24 @@ def test_apply_changeset_add_section_and_catalog_line(db_session):
     assert sec.lines[0].item_id == item.id
 
 
+def test_apply_changeset_sort_order_distinct_for_batch_lines(db_session):
+    est, item = _estimate_with_catalog(db_session)
+    ops = [
+        schemas.AddSection(op="add_section", name="Обор"),
+        schemas.AddCatalogLine(op="add_catalog_line", section_name="Обор",
+                               catalog_item_id=item.id, qty=Decimal("1")),
+        schemas.AddCustomLine(op="add_custom_line", section_name="Обор",
+                              name="Монтаж", unit="шт", qty=Decimal("1")),
+        schemas.AddCatalogLine(op="add_catalog_line", section_name="Обор",
+                               catalog_item_id=item.id, qty=Decimal("2")),
+    ]
+    asvc.apply_changeset(db_session, est, ops)
+    db_session.refresh(est)
+    sec = est.branches[0].sections[0]
+    orders = sorted(ln.sort_order for ln in sec.lines)
+    assert orders == [0, 1, 2]  # уникальные, не все 0
+
+
 def test_apply_changeset_set_qty_and_delete(db_session):
     from app.estimates import models as em
     est, item = _estimate_with_catalog(db_session)
