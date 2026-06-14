@@ -4,14 +4,43 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ColumnMapping(BaseModel):
-    """Маппинг колонок файла: индексы колонок; price_cols: {price_level_id: column_index}."""
+    """Маппинг колонок листа: индексы; price_cols: {price_level_id: column_index}.
+    on_request_cols — индексы ценовых колонок «по запросу» (у.е.) → цена 0 + отметка."""
 
     name_col: int
     article_col: int | None = None
     unit_col: int | None = None
     category_col: int | None = None
     characteristics_col: int | None = None
+    manufacturer_col: int | None = None
+    header_row: int = 0
+    data_start_row: int | None = None
     price_cols: dict[int, int] = Field(default_factory=dict)
+    on_request_cols: list[int] = Field(default_factory=list)
+
+
+class PriceColumnOut(BaseModel):
+    index: int
+    label: str
+    sample: str = ""
+    on_request: bool = False
+
+
+class DetectedLayoutOut(BaseModel):
+    header_row: int
+    data_start_row: int
+    name_col: int | None = None
+    article_col: int | None = None
+    chars_col: int | None = None
+    unit_col: int | None = None
+    manufacturer_col: int | None = None
+    price_columns: list[PriceColumnOut] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+class ImportSheetMapping(BaseModel):
+    name: str
+    mapping: ColumnMapping
 
 
 class PriceLevelIn(BaseModel):
@@ -55,6 +84,7 @@ class SheetOut(BaseModel):
     row_count: int
     header_row: int
     columns: list[ColumnOut]
+    detected: DetectedLayoutOut | None = None
 
 
 class InspectOut(BaseModel):
@@ -82,6 +112,8 @@ class ItemOut(BaseModel):
     unit: str
     category: str
     kind: str
+    manufacturer: str | None = None
+    price_on_request: bool = False
     prices: dict[int, Decimal] = {}
     characteristics: dict | None = None
 
