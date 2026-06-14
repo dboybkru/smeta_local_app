@@ -44,15 +44,14 @@ def test_search_multiword_no_match(db_session):
 def import_bolid(client, admin):
     retail = client.post("/api/price-levels", json={"name": "Розница"}, headers=admin).json()["id"]
     supplier_id = client.post("/api/suppliers", json={"name": "Bolid"}, headers=admin).json()["id"]
-    mapping = {"name_col": 0, "article_col": 2, "price_cols": {retail: 3}}
+    mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {retail: 3}}
     client.post(
         "/api/catalog/import",
         files={"file": ("bolid.xlsx", make_bolid_xlsx())},
         data={
             "supplier_id": str(supplier_id),
             "kind": "material",
-            "sheets": json.dumps(["Болид"]),
-            "mapping": json.dumps(mapping),
+            "sheet_mappings": json.dumps([{"name": "Болид", "mapping": mapping}]),
             "use_sheet_as_category": "false",
             "save_mapping": "false",
         },

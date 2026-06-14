@@ -82,10 +82,15 @@ def parse_rows(rows: Rows, mapping: ColumnMapping, default_category: str = "") -
     data_start = mapping.data_start_row if mapping.data_start_row is not None \
         else mapping.header_row + 1
     on_request_cols = set(mapping.on_request_cols)
+    header_name = ""
+    if 0 <= mapping.header_row < len(rows):
+        header_name = _cell(rows[mapping.header_row], mapping.name_col)
     parsed: list[ParsedRow] = []
     current_category = ""
     for row in rows[data_start:]:
         name = _cell(row, mapping.name_col)
+        if name and header_name and name == header_name:
+            continue
         prices: dict[int, Decimal] = {}
         on_request = False
         price_problems: list[str] = []
@@ -119,7 +124,9 @@ def parse_rows(rows: Rows, mapping: ColumnMapping, default_category: str = "") -
                 continue
             item = _build_row(row, mapping, name, current_category, default_category,
                               prices, on_request)
-            item.problems.append("Нет ни одной цены")
+            if mapping.price_cols:
+                # ценовые колонки настроены, но в этой строке цен нет — это проблема
+                item.problems.append("Нет ни одной цены")
             parsed.append(item)
             continue
 

@@ -8,16 +8,15 @@ def test_import_returns_problems(client):
     admin = make_admin(client)
     retail = create_level(client, admin, "Розница")
     supplier_id = create_supplier(client, admin, "P")
-    csv_content = "Название;Цена\nТовар;договорная\nНорм;100\n".encode()
-    mapping = {"name_col": 0, "price_cols": {retail: 1}}
+    csv_content = "Название;Цена\nТовар;нечисло\nНорм;100\n".encode()
+    mapping = {"name_col": 0, "header_row": 0, "price_cols": {retail: 1}}
     resp = client.post(
         "/api/catalog/import",
         files={"file": ("p.csv", csv_content)},
         data={
             "supplier_id": str(supplier_id),
             "kind": "material",
-            "sheets": json.dumps(["csv"]),
-            "mapping": json.dumps(mapping),
+            "sheet_mappings": json.dumps([{"name": "csv", "mapping": mapping}]),
             "use_sheet_as_category": "false",
             "save_mapping": "false",
         },
@@ -59,15 +58,14 @@ def test_import_bolid_end_to_end(client):
     retail = create_level(client, admin, "Розница")
     opt = create_level(client, admin, "Опт")
     supplier_id = create_supplier(client, admin)
-    mapping = {"name_col": 0, "article_col": 2, "price_cols": {retail: 3, opt: 4}}
+    mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {retail: 3, opt: 4}}
     resp = client.post(
         "/api/catalog/import",
         files={"file": ("bolid.xlsx", make_bolid_xlsx())},
         data={
             "supplier_id": str(supplier_id),
             "kind": "material",
-            "sheets": json.dumps(["Болид"]),
-            "mapping": json.dumps(mapping),
+            "sheet_mappings": json.dumps([{"name": "Болид", "mapping": mapping}]),
             "use_sheet_as_category": "false",
             "save_mapping": "true",
         },
@@ -87,15 +85,18 @@ def test_import_optimus_sheet_as_category(client):
     admin = make_admin(client)
     partner = create_level(client, admin, "Партнёр")
     supplier_id = create_supplier(client, admin, "Optimus")
-    mapping = {"name_col": 1, "article_col": 0, "price_cols": {partner: 2}}
+    mapping = {"name_col": 1, "article_col": 0, "header_row": 2, "price_cols": {partner: 2}}
+    sheet_mappings = [
+        {"name": name, "mapping": mapping}
+        for name in ["IP камеры", "Сетевое оборудование"]
+    ]
     resp = client.post(
         "/api/catalog/import",
         files={"file": ("optimus.xlsx", make_optimus_xlsx())},
         data={
             "supplier_id": str(supplier_id),
             "kind": "material",
-            "sheets": json.dumps(["IP камеры", "Сетевое оборудование"]),
-            "mapping": json.dumps(mapping),
+            "sheet_mappings": json.dumps(sheet_mappings),
             "use_sheet_as_category": "true",
             "save_mapping": "false",
         },
@@ -113,8 +114,9 @@ def test_import_unknown_supplier_404(client):
         data={
             "supplier_id": "999",
             "kind": "material",
-            "sheets": json.dumps(["Болид"]),
-            "mapping": json.dumps({"name_col": 0, "price_cols": {}}),
+            "sheet_mappings": json.dumps(
+                [{"name": "Болид", "mapping": {"name_col": 0, "header_row": 0, "price_cols": {}}}]
+            ),
             "use_sheet_as_category": "false",
             "save_mapping": "false",
         },
@@ -148,3 +150,37 @@ def test_corrupt_xlsx_422(client):
         headers=admin,
     )
     assert resp.status_code == 422
+
+
+def test_inspect_returns_detected(client):
+    admin = make_admin(client)
+    resp = client.post(
+        "/api/catalog/inspect",
+        files={"file": ("bolid.xlsx", make_bolid_xlsx())},
+        headers=admin,
+    )
+    assert resp.status_code == 200
+    sheet = resp.json()["sheets"][0]
+    assert sheet["detected"] is not None
+    assert sheet["detected"]["name_col"] == 0
+
+
+def test_import_per_sheet_mapping(client):
+    admin = make_admin(client)
+    retail = create_level(client, admin, "Розница")
+    supplier_id = create_supplier(client, admin, "PS")
+    mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {retail: 3}}
+    resp = client.post(
+        "/api/catalog/import",
+        files={"file": ("bolid.xlsx", make_bolid_xlsx())},
+        data={
+            "supplier_id": str(supplier_id),
+            "kind": "material",
+            "sheet_mappings": json.dumps([{"name": "Болид", "mapping": mapping}]),
+            "use_sheet_as_category": "false",
+            "save_mapping": "false",
+        },
+        headers=admin,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["items_created"] == 3

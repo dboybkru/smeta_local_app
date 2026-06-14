@@ -7,15 +7,17 @@ from sqlalchemy.orm import Session
 from app.ai.errors import AIError, AINotConfigured
 from app.auth.deps import require_active, require_admin
 from app.catalog import characteristics as ch_service
-from app.catalog import importer, parser, service
+from app.catalog import detect, importer, parser, service
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.catalog.schemas import (
-    ColumnMapping,
     ColumnOut,
+    DetectedLayoutOut,
+    ImportSheetMapping,
     ImportSummaryOut,
     InspectOut,
     ItemOut,
     ItemsPageOut,
+    PriceColumnOut,
     PriceHistoryOut,
     PriceLevelIn,
     PriceLevelOut,
@@ -138,8 +140,27 @@ async def inspect_file(file: UploadFile = File(...)):
             ColumnOut(index=c.index, header=c.header, samples=c.samples)
             for c in parser.extract_columns(rows, header_row)
         ]
+        layout = detect.detect_layout(rows)
+        detected = None
+        if layout is not None:
+            detected = DetectedLayoutOut(
+                header_row=layout.header_row,
+                data_start_row=layout.data_start_row,
+                name_col=layout.name_col,
+                article_col=layout.article_col,
+                chars_col=layout.chars_col,
+                unit_col=layout.unit_col,
+                manufacturer_col=layout.manufacturer_col,
+                price_columns=[
+                    PriceColumnOut(index=p.index, label=p.label, sample=p.sample,
+                                   on_request=p.on_request)
+                    for p in layout.price_columns
+                ],
+                confidence=layout.confidence,
+            )
         sheets.append(
-            SheetOut(name=name, row_count=len(rows), header_row=header_row, columns=columns)
+            SheetOut(name=name, row_count=len(rows), header_row=header_row,
+                     columns=columns, detected=detected)
         )
     return InspectOut(sheets=sheets)
 
@@ -151,8 +172,7 @@ async def import_file(
     file: UploadFile = File(...),
     supplier_id: int = Form(...),
     kind: str = Form(...),
-    sheets: str = Form(...),
-    mapping: str = Form(...),
+    sheet_mappings: str = Form(...),
     use_sheet_as_category: bool = Form(False),
     save_mapping: bool = Form(False),
     db: Session = Depends(get_db),
@@ -163,24 +183,22 @@ async def import_file(
     if kind not in ("material", "work"):
         raise HTTPException(status_code=422, detail="kind: material или work")
     try:
-        sheet_names = json_lib.loads(sheets)
-        col_mapping = ColumnMapping.model_validate(json_lib.loads(mapping))
+        items = [ImportSheetMapping.model_validate(x) for x in json_lib.loads(sheet_mappings)]
     except (ValueError, TypeError):
-        raise HTTPException(status_code=422, detail="Невалидный JSON в sheets/mapping")
+        raise HTTPException(status_code=422, detail="Невалидный JSON в sheet_mappings")
+    if not items:
+        raise HTTPException(status_code=422, detail="Не выбран ни один лист")
 
     tables = _load_tables_or_415(await _read_limited(file), file.filename or "")
     parsed: list[importer.ParsedRow] = []
-    for sheet_name in sheet_names:
-        if sheet_name not in tables:
-            raise HTTPException(status_code=422, detail=f"Лист «{sheet_name}» не найден")
-        rows = tables[sheet_name]
-        header_row = parser.detect_header_row(rows)
+    for sm in items:
+        if sm.name not in tables:
+            raise HTTPException(status_code=422, detail=f"Лист «{sm.name}» не найден")
         parsed.extend(
             importer.parse_rows(
-                rows,
-                header_row,
-                col_mapping,
-                default_category=sheet_name if use_sheet_as_category else "",
+                tables[sm.name],
+                sm.mapping,
+                default_category=sm.name if use_sheet_as_category else "",
             )
         )
 
@@ -191,8 +209,8 @@ async def import_file(
     except Exception:
         db.rollback()
         raise
-    if save_mapping:
-        supplier.column_mapping_template = col_mapping.model_dump()
+    if save_mapping and items:
+        supplier.column_mapping_template = items[0].mapping.model_dump()
         db.commit()
     return ImportSummaryOut(**summary.__dict__)
 
@@ -227,6 +245,8 @@ def list_items(
             unit=i.unit,
             category=i.category,
             kind=i.kind,
+            manufacturer=i.manufacturer,
+            price_on_request=i.price_on_request,
             prices=prices.get(i.id, {}),
             characteristics=i.characteristics,
         )
