@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.errors import AIError, AINotConfigured
 from app.auth.deps import require_active, require_admin
+from app.catalog import characteristics as ch_service
 from app.catalog import importer, parser, service
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.catalog.schemas import (
@@ -269,3 +271,19 @@ def list_price_lists(supplier_id: int | None = None, db: Session = Depends(get_d
         )
         for pl in rows
     ]
+
+
+@router.post(
+    "/catalog/extract-characteristics", dependencies=[Depends(require_admin)]
+)
+def extract_characteristics(
+    supplier_id: int | None = None,
+    batch: int = 40,
+    db: Session = Depends(get_db),
+):
+    try:
+        return ch_service.extract_batch(db, batch=batch, supplier_id=supplier_id)
+    except AINotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except AIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
