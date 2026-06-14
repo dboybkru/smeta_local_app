@@ -36,3 +36,34 @@ def test_list_items_returns_characteristics(client, db_session):
     assert r.status_code == 200, r.text
     item = next(x for x in r.json()["items"] if x["id"] == it.id)
     assert item["characteristics"] == {"Разрешение": "2 Мп"}
+
+
+from app.ai import service as ai_service  # noqa: E402
+from app.catalog import characteristics as ch  # noqa: E402
+
+
+def test_extract_batch_sets_characteristics(db_session, monkeypatch):
+    it = _item(db_session, name="Камера IP 2Мп PoE")
+    monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {
+        "items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп", "Питание": "PoE"}}]
+    })
+    res = ch.extract_batch(db_session, batch=40)
+    assert res["processed"] == 1
+    assert res["remaining"] == 0
+    db_session.refresh(it)
+    assert it.characteristics == {"Разрешение": "2 Мп", "Питание": "PoE"}
+
+
+def test_extract_batch_marks_unanswered_as_empty(db_session, monkeypatch):
+    it = _item(db_session, name="Непонятная позиция")
+    monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {"items": []})
+    res = ch.extract_batch(db_session, batch=40)
+    assert res["processed"] == 1
+    db_session.refresh(it)
+    assert it.characteristics == {}  # обработана, но пусто — не зациклит
+
+
+def test_extract_batch_empty_when_nothing_to_do(db_session, monkeypatch):
+    monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {"items": []})
+    res = ch.extract_batch(db_session, batch=40)
+    assert res == {"processed": 0, "remaining": 0}
