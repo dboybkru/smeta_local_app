@@ -12,6 +12,9 @@ export default function AppHeader() {
         <Link to="/catalog" className="text-stone-600 hover:text-stone-900">Каталог</Link>
         <Link to="/estimates" className="text-stone-600 hover:text-stone-900">Сметы</Link>
         {canEdit && (
+          <Link to="/clients" className="text-stone-600 hover:text-stone-900">Клиенты</Link>
+        )}
+        {canEdit && (
           <Link to="/profile" className="text-stone-600 hover:text-stone-900">Реквизиты</Link>
         )}
         {isAdmin && (
