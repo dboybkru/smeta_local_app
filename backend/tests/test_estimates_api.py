@@ -1,9 +1,23 @@
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.core.security import create_access_token
+from app.orgs.models import Organization
+
+
+def _get_org(db_session):
+    """Return or create the single test org for this session."""
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    return org
 
 
 def _user(db_session, role="estimator", email=None):
-    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active")
+    org = _get_org(db_session)
+    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
     return u

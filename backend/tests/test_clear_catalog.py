@@ -1,11 +1,24 @@
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.core.security import create_access_token
 from app.estimates.models import Estimate, EstimateBranch, EstimateLine, EstimateSection
+from app.orgs.models import Organization
+
+
+def _get_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _admin(db):
-    u = User(email="a@x.ru", name="A", role="org_admin", status="active")
+    org = _get_org(db)
+    u = User(email="a@x.ru", name="A", role="org_admin", status="active", org_id=org.id)
     db.add(u); db.commit(); return u
 
 
@@ -28,7 +41,8 @@ def _supplier_with_item(db, name="S"):
 def test_clear_catalog_deletes_items_and_unlinks_estimate_lines(client, db_session):
     a = _admin(db_session)
     sup, it = _supplier_with_item(db_session)
-    est = Estimate(owner_id=a.id, object_name="O"); db_session.add(est); db_session.commit()
+    org = _get_org(db_session)
+    est = Estimate(owner_id=a.id, org_id=org.id, object_name="O"); db_session.add(est); db_session.commit()
     br = EstimateBranch(estimate_id=est.id, name="Базовая"); db_session.add(br); db_session.commit()
     sec = EstimateSection(branch_id=br.id, name="С"); db_session.add(sec); db_session.commit()
     ln = EstimateLine(section_id=sec.id, item_id=it.id, name="Камера", unit="шт", qty=1,
@@ -55,7 +69,8 @@ def test_clear_catalog_per_supplier(client, db_session):
 
 
 def test_clear_catalog_admin_only(client, db_session):
-    e = User(email="e@x.ru", name="E", role="estimator", status="active")
+    org = _get_org(db_session)
+    e = User(email="e@x.ru", name="E", role="estimator", status="active", org_id=org.id)
     db_session.add(e); db_session.commit()
     assert client.request("DELETE", "/api/catalog/items", headers=_hdr(e)).status_code == 403
 

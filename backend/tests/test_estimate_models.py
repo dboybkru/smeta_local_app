@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.estimates.models import (
     Estimate,
@@ -7,10 +9,21 @@ from app.estimates.models import (
     EstimateLine,
     EstimateSection,
 )
+from app.orgs.models import Organization
+
+
+def _get_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _owner(db):
-    u = User(email="o@x.ru", name="O", role="estimator", status="active")
+    org = _get_org(db)
+    u = User(email="o@x.ru", name="O", role="estimator", status="active", org_id=org.id)
     db.add(u)
     db.commit()
     return u
@@ -18,7 +31,8 @@ def _owner(db):
 
 def test_estimate_defaults_and_relationships(db_session):
     owner = _owner(db_session)
-    est = Estimate(owner_id=owner.id, object_name="Объект 1")
+    org = _get_org(db_session)
+    est = Estimate(owner_id=owner.id, org_id=org.id, object_name="Объект 1")
     db_session.add(est)
     db_session.commit()
     assert est.status == "draft"
@@ -29,7 +43,8 @@ def test_estimate_defaults_and_relationships(db_session):
 
 def test_cascade_delete_estimate_removes_children(db_session):
     owner = _owner(db_session)
-    est = Estimate(owner_id=owner.id, object_name="O")
+    org = _get_org(db_session)
+    est = Estimate(owner_id=owner.id, org_id=org.id, object_name="O")
     branch = EstimateBranch(estimate=est, name="Базовая")
     section = EstimateSection(branch=branch, name="Раздел 1")
     EstimateLine(section=section, name="Позиция", unit="шт", qty=Decimal("2"))

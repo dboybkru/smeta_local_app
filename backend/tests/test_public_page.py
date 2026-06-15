@@ -1,16 +1,24 @@
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.estimates.models import Estimate, EstimateBranch, EstimateLine, EstimateSection
+from app.orgs.models import Organization
 from app.publiclinks import public_router
 from app.publiclinks.models import PublicLink
 
 
 def _estimate_with_link(db_session, **link_kwargs):
-    u = User(email="u@x.ru", name="U", role="estimator", status="active")
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    u = User(email="u@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
-    est = Estimate(owner_id=u.id, object_name="Объект Икс")
+    est = Estimate(owner_id=u.id, org_id=org.id, object_name="Объект Икс")
     branch = EstimateBranch(name="Базовая")
     section = EstimateSection(name="Кровля", markup_percent=0)
     section.lines.append(

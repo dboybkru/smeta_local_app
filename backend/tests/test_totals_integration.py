@@ -1,12 +1,25 @@
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.core.security import create_access_token
+from app.orgs.models import Organization
+
+
+def _get_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _user(db, role="estimator", email=None):
-    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active")
+    org = _get_org(db)
+    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active", org_id=org.id)
     db.add(u)
     db.commit()
     return u

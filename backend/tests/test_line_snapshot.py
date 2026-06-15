@@ -1,8 +1,20 @@
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.estimates.models import Client
 from app.estimates.service import snapshot_line_values
+from app.orgs.models import Organization
+
+
+def _get_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _catalog(db, kind="material", prices=None):
@@ -37,7 +49,8 @@ def test_material_snapshot_uses_client_level_and_zakupka(db_session):
     item, levels = _catalog(
         db_session, kind="material", prices={"Закупка": "100.00", "Розница": "150.00"}
     )
-    client = Client(name="C", default_price_level_id=levels["Розница"].id)
+    org = _get_org(db_session)
+    client = Client(name="C", org_id=org.id, default_price_level_id=levels["Розница"].id)
     db_session.add(client)
     db_session.commit()
     work, material, purchase = snapshot_line_values(db_session, item, client)
@@ -48,7 +61,8 @@ def test_material_snapshot_uses_client_level_and_zakupka(db_session):
 
 def test_work_kind_fills_work_price(db_session):
     item, levels = _catalog(db_session, kind="work", prices={"Розница": "500.00"})
-    client = Client(name="C", default_price_level_id=levels["Розница"].id)
+    org = _get_org(db_session)
+    client = Client(name="C", org_id=org.id, default_price_level_id=levels["Розница"].id)
     db_session.add(client)
     db_session.commit()
     work, material, purchase = snapshot_line_values(db_session, item, client)
