@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 # Должно стоять до создания TestClient (триггерит lifespan→start_worker).
 os.environ.setdefault("JOBS_WORKER_DISABLED", "1")
 
+from app.orgs import models as _orgs_models  # noqa: E402, F401
 from app.auth import models as _models  # noqa: E402, F401 — регистрирует таблицы в metadata
 from app.catalog import models as _catalog_models  # noqa: E402, F401
 from app.core.db import Base, get_db  # noqa: E402
