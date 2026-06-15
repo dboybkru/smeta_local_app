@@ -41,4 +41,4 @@ def rename_org(
         raise HTTPException(status_code=409, detail="Организация с таким именем уже есть")
     org.name = body.name
     db.commit()
-    return {"id": org.id, "name": org.name, "user_count": 0}
+    return {"id": org.id, "name": org.name, "user_count": service.count_users(db, org.id)}
