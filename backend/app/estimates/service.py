@@ -153,7 +153,9 @@ def snapshot_line_values(
 
 def build_estimate_detail(est: models.Estimate, user: User) -> "schemas.EstimateDetail":
     """Деталь сметы с роле-зависимым сокрытием маржи/закупки (общий код для get/apply)."""
-    can_see_margin = user.role in ("admin", "org_admin") or user.is_superuser or est.owner_id == user.id
+    can_see_margin = (
+        user.role == "org_admin" or user.is_superuser or est.owner_id == user.id
+    )
     totals = compute_totals(est)
     if not can_see_margin:
         for s in totals["sections"]:
