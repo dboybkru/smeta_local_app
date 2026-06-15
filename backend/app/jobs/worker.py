@@ -19,7 +19,9 @@ _MAX_BATCHES = 1000
 def _run_catalog_extract(db, job: Job) -> None:
     params = job.params or {}
     supplier_id = params.get("supplier_id")
-    org_id = params.get("org_id")  # may be None for legacy jobs — process all orgs safely
+    org_id = params.get("org_id")
+    if org_id is None:
+        raise ValueError("org_id отсутствует в параметрах задачи")
     total = ch._remaining(db, supplier_id, org_id=org_id)
     job.total = total
     job.processed = 0

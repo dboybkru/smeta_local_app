@@ -56,7 +56,7 @@ def test_material_snapshot_uses_client_level_and_zakupka(db_session):
     client = Client(name="C", org_id=org.id, default_price_level_id=levels["Розница"].id)
     db_session.add(client)
     db_session.commit()
-    work, material, purchase = snapshot_line_values(db_session, item, client)
+    work, material, purchase = snapshot_line_values(db_session, item, client, org_id=org.id)
     assert material == Decimal("150.00")
     assert work == Decimal("0")
     assert purchase == Decimal("100.00")
@@ -68,7 +68,7 @@ def test_work_kind_fills_work_price(db_session):
     client = Client(name="C", org_id=org.id, default_price_level_id=levels["Розница"].id)
     db_session.add(client)
     db_session.commit()
-    work, material, purchase = snapshot_line_values(db_session, item, client)
+    work, material, purchase = snapshot_line_values(db_session, item, client, org_id=org.id)
     assert work == Decimal("500.00")
     assert material == Decimal("0")
     assert purchase is None  # нет уровня «Закупка»
@@ -78,6 +78,7 @@ def test_no_client_uses_first_level_by_sort_order(db_session):
     item, levels = _catalog(
         db_session, kind="material", prices={"Розница": "150.00", "Опт": "120.00"}
     )
+    org = _get_org(db_session)
     # Розница sort_order=0 (добавлена первой) → используется когда client=None
-    work, material, purchase = snapshot_line_values(db_session, item, None)
+    work, material, purchase = snapshot_line_values(db_session, item, None, org_id=org.id)
     assert material == Decimal("150.00")

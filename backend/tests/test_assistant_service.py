@@ -167,7 +167,7 @@ def test_candidates_include_characteristics(db_session):
     it = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material",
                      characteristics={"Разрешение": "2 Мп"}, org_id=org.id)
     db_session.add(it); db_session.commit()
-    text, items = asvc._candidates(db_session, ["камера"])
+    text, items = asvc._candidates(db_session, ["камера"], org_id=org.id)
     assert "Разрешение" in text
 
 
@@ -186,7 +186,8 @@ def test_candidates_per_word_fallback_for_overspecified_query(db_session):
     it = CatalogItem(supplier_id=sup.id, name="Видеокамера Optimus IP-E014", article="B",
                      unit="шт", kind="material", org_id=org.id)
     db_session.add(it); db_session.commit()
-    text, items = asvc._candidates(db_session, ["камера уличная 4мп с ик подсветкой"])
+    text, items = asvc._candidates(db_session, ["камера уличная 4мп с ик подсветкой"],
+                                   org_id=org.id)
     assert any(i.id == it.id for i in items)
 
 

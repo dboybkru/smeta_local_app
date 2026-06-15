@@ -37,8 +37,9 @@ def _items(db):
 
 
 def test_search_items_facet_filter(db_session):
-    _items(db_session)
-    items, total = search_items(db_session, facets={"Разрешение": "2 Мп"})
+    sup = _items(db_session)
+    org = _get_or_create_org(db_session)
+    items, total = search_items(db_session, facets={"Разрешение": "2 Мп"}, org_id=org.id)
     assert total == 1 and items[0].name == "Камера A"
 
 

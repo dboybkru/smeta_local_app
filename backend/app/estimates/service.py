@@ -165,7 +165,7 @@ def snapshot_line_values(
     db: Session,
     item: CatalogItem,
     client: models.Client | None,
-    org_id: int | None = None,
+    org_id: int,
 ) -> tuple[Decimal, Decimal, Decimal | None]:
     """Возвращает (work_price, material_price, purchase_price_snapshot).
 
@@ -176,16 +176,18 @@ def snapshot_line_values(
 
     sell_level_id = client.default_price_level_id if client else None
     if sell_level_id is None:
-        q = select(PriceLevel).order_by(PriceLevel.sort_order, PriceLevel.id)
-        if org_id is not None:
-            q = q.where(PriceLevel.org_id == org_id)
+        q = (
+            select(PriceLevel)
+            .where(PriceLevel.org_id == org_id)
+            .order_by(PriceLevel.sort_order, PriceLevel.id)
+        )
         first = db.scalars(q).first()
         sell_level_id = first.id if first else None
     sell = prices.get(sell_level_id, Decimal("0")) if sell_level_id is not None else Decimal("0")
 
-    q_zak = select(PriceLevel).where(PriceLevel.name == ZAKUPKA_LEVEL_NAME)
-    if org_id is not None:
-        q_zak = q_zak.where(PriceLevel.org_id == org_id)
+    q_zak = select(PriceLevel).where(
+        PriceLevel.name == ZAKUPKA_LEVEL_NAME, PriceLevel.org_id == org_id
+    )
     zakupka = db.scalars(q_zak).first()
     purchase = prices.get(zakupka.id) if zakupka is not None else None
 

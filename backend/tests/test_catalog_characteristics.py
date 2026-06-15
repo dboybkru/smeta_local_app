@@ -59,10 +59,11 @@ from app.catalog import characteristics as ch  # noqa: E402
 
 def test_extract_batch_sets_characteristics(db_session, monkeypatch):
     it = _item(db_session, name="Камера IP 2Мп PoE")
+    org = _get_or_create_org(db_session)
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {
         "items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп", "Питание": "PoE"}}]
     })
-    res = ch.extract_batch(db_session, batch=40)
+    res = ch.extract_batch(db_session, batch=40, org_id=org.id)
     assert res["processed"] == 1
     assert res["remaining"] == 0
     db_session.refresh(it)
@@ -71,21 +72,24 @@ def test_extract_batch_sets_characteristics(db_session, monkeypatch):
 
 def test_extract_batch_marks_unanswered_as_empty(db_session, monkeypatch):
     it = _item(db_session, name="Непонятная позиция")
+    org = _get_or_create_org(db_session)
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {"items": []})
-    res = ch.extract_batch(db_session, batch=40)
+    res = ch.extract_batch(db_session, batch=40, org_id=org.id)
     assert res["processed"] == 1
     db_session.refresh(it)
     assert it.characteristics == {}  # обработана, но пусто — не зациклит
 
 
 def test_extract_batch_empty_when_nothing_to_do(db_session, monkeypatch):
+    org = _get_or_create_org(db_session)
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {"items": []})
-    res = ch.extract_batch(db_session, batch=40)
+    res = ch.extract_batch(db_session, batch=40, org_id=org.id)
     assert res == {"processed": 0, "remaining": 0}
 
 
 def test_extract_uses_raw_as_source(db_session, monkeypatch):
     it = _item(db_session, name="Камера X")
+    org = _get_or_create_org(db_session)
     it.characteristics_raw = "2 Мп, объектив 2.8мм, IP67"
     db_session.commit()
     captured = {}
@@ -93,7 +97,7 @@ def test_extract_uses_raw_as_source(db_session, monkeypatch):
         captured["prompt"] = messages[-1]["content"]
         return {"items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп"}}]}
     monkeypatch.setattr(ai_service, "call_llm", fake)
-    ch.extract_batch(db_session, batch=40)
+    ch.extract_batch(db_session, batch=40, org_id=org.id)
     assert "2.8мм" in captured["prompt"]  # сырьё попало в промпт
     db_session.refresh(it)
     assert it.characteristics == {"Разрешение": "2 Мп"}

@@ -40,9 +40,10 @@ def _item(db, name="Камера 2Мп"):
 
 def test_claim_and_run_executes_catalog_extract(db_session, monkeypatch):
     it = _item(db_session)
+    org = _get_or_create_org(db_session)
     monkeypatch.setattr(ai_service, "call_llm", lambda *a, **k: {
         "items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп"}}]})
-    job = Job(type="catalog_extract", params={})
+    job = Job(type="catalog_extract", params={"org_id": org.id})
     db_session.add(job); db_session.commit()
 
     assert worker.claim_and_run(db_session) is True

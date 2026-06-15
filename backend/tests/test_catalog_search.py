@@ -38,20 +38,23 @@ def test_variants_swaps_layout():
 
 def test_search_wrong_layout_finds(db_session):
     _mk_item(db_session, "Видеокамера Optimus AHD")
-    items, total = search_items(db_session, q="rfvthf")
+    org = _get_or_create_org(db_session)
+    items, total = search_items(db_session, q="rfvthf", org_id=org.id)
     assert total == 1 and items[0].name == "Видеокамера Optimus AHD"
 
 
 def test_search_multiword_any_order(db_session):
     _mk_item(db_session, "Видеокамера Optimus AHD")
-    a, _ = search_items(db_session, q="optimus камера")
-    b, _ = search_items(db_session, q="камера optimus")
+    org = _get_or_create_org(db_session)
+    a, _ = search_items(db_session, q="optimus камера", org_id=org.id)
+    b, _ = search_items(db_session, q="камера optimus", org_id=org.id)
     assert len(a) == 1 and len(b) == 1
 
 
 def test_search_multiword_no_match(db_session):
     _mk_item(db_session, "Кабель UTP")
-    items, total = search_items(db_session, q="камера optimus")
+    org = _get_or_create_org(db_session)
+    items, total = search_items(db_session, q="камера optimus", org_id=org.id)
     assert total == 0 and items == []
 
 
