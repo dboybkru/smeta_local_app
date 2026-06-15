@@ -89,7 +89,7 @@ export default function PublicLinksManager({ estimateId, canEdit }: { estimateId
             <span className={l.revoked ? "text-stone-400 line-through" : "text-stone-700"}>{publicUrl(l.token)}</span>
             <span className="text-stone-400">· {l.level}{l.expires_at ? ` · до ${new Date(l.expires_at).toLocaleDateString()}` : ""}</span>
             {!l.revoked && (
-              <button onClick={() => navigator.clipboard?.writeText(publicUrl(l.token))} className="text-stone-600 underline">копировать</button>
+              <button onClick={() => navigator.clipboard?.writeText(publicUrl(l.token)).catch(() => undefined)} className="text-stone-600 underline">копировать</button>
             )}
             {canEdit && !l.revoked && (
               <button onClick={() => revoke(l.id)} className="text-red-700">Отозвать</button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   deleteAllModels, deleteModel, listModels, listProviders, manufacturer, testModel, updateModel,
   type AiModel, type ModelPatch, type Provider,
@@ -14,7 +14,7 @@ export default function ModelsSection({ version, onChanged }: Props) {
   const [error, setError] = useState("");
   const [tests, setTests] = useState<Record<number, { ok: boolean; detail: string } | "...">>({});
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [ps, ms] = await Promise.all([
         listProviders(),
@@ -25,8 +25,8 @@ export default function ModelsSection({ version, onChanged }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     }
-  }
-  useEffect(() => { void load(); }, [version, filter]);
+  }, [filter]);
+  useEffect(() => { void load(); }, [load, version]);
 
   function providerName(id: number) {
     return providers.find((p) => p.id === id)?.name ?? `#${id}`;

@@ -29,8 +29,10 @@ async function rawRequest(path: string, options: RequestInit = {}) {
   return fetch(`${BASE}${path}`, { ...options, headers });
 }
 
-// TODO(v2): общий refresh-promise, чтобы параллельные 401 не гонялись за refresh
-export async function tryRefresh(): Promise<boolean> {
+// Shared in-flight refresh promise: N concurrent 401s trigger exactly ONE /auth/refresh call.
+let refreshing: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
   const { refresh } = getTokens();
   if (!refresh) return false;
   const resp = await fetch(`${BASE}/auth/refresh`, {
@@ -38,11 +40,23 @@ export async function tryRefresh(): Promise<boolean> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refresh }),
   });
-  if (!resp.ok) return false;
+  if (!resp.ok) {
+    clearTokens();
+    return false;
+  }
   const body = await resp.json().catch(() => null);
-  if (!body?.access_token || !body?.refresh_token) return false;
+  if (!body?.access_token || !body?.refresh_token) {
+    clearTokens();
+    return false;
+  }
   setTokens(body.access_token, body.refresh_token);
   return true;
+}
+
+export async function tryRefresh(): Promise<boolean> {
+  if (refreshing !== null) return refreshing;
+  refreshing = doRefresh().finally(() => { refreshing = null; });
+  return refreshing;
 }
 
 export class ApiError extends Error {

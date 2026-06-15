@@ -38,6 +38,7 @@ export default function SectionTable({
     <div className="mb-6">
       <div className="mb-1 flex items-center gap-2">
         <input
+          aria-label="Название раздела"
           value={name}
           disabled={!canEdit}
           onChange={(e) => setName(e.target.value)}
@@ -97,7 +98,7 @@ export default function SectionTable({
                 )}
                 {canEdit && (
                   <td className="text-right">
-                    <button onClick={() => onDeleteLine(l.id)} className="text-red-700">×</button>
+                    <button type="button" aria-label="Удалить строку" onClick={() => onDeleteLine(l.id)} className="text-red-700">×</button>
                   </td>
                 )}
               </tr>
@@ -142,6 +143,7 @@ function FreeformRow({ onAdd, onCancel }: { onAdd: (b: LineCreate) => void; onCa
       <input value={unit} onChange={(e) => setUnit(e.target.value)} className="w-16 rounded border border-stone-300 px-2 py-1" />
       <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="цена" className="w-24 rounded border border-stone-300 px-2 py-1" />
       <button
+        type="button"
         onClick={() => name.trim() && onAdd({ name: name.trim(), unit, qty: "1", material_price: price || "0" })}
         className="rounded border border-stone-700 px-2 py-1 text-stone-700"
       >
