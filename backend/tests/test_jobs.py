@@ -6,10 +6,21 @@ from app.catalog.models import CatalogItem, Supplier
 from app.core.security import create_access_token
 from app.jobs import worker
 from app.jobs.models import Job
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _admin(db):
-    u = User(email="a@x.ru", name="A", role="org_admin", status="active")
+    org = _get_or_create_org(db)
+    u = User(email="a@x.ru", name="A", role="org_admin", status="active", org_id=org.id)
     db.add(u); db.commit(); return u
 
 
@@ -18,8 +29,11 @@ def _hdr(u):
 
 
 def _item(db, name="Камера 2Мп"):
-    sup = Supplier(name="P"); db.add(sup); db.commit()
-    it = CatalogItem(supplier_id=sup.id, name=name, article="A", unit="шт", kind="material")
+    org = _get_or_create_org(db)
+    sup = Supplier(name="P", org_id=org.id); db.add(sup); db.commit()
+    it = CatalogItem(
+        supplier_id=sup.id, name=name, article="A", unit="шт", kind="material", org_id=org.id
+    )
     db.add(it); db.commit(); db.refresh(it)
     return it
 
@@ -64,7 +78,8 @@ def test_start_endpoint_enqueues_and_dedups(client, db_session):
 
 
 def test_start_endpoint_admin_only(client, db_session):
-    e = User(email="e@x.ru", name="E", role="estimator", status="active")
+    org = _get_or_create_org(db_session)
+    e = User(email="e@x.ru", name="E", role="estimator", status="active", org_id=org.id)
     db_session.add(e); db_session.commit()
     r = client.post("/api/catalog/extract-characteristics/start", headers=_hdr(e))
     assert r.status_code == 403

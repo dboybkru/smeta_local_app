@@ -2,23 +2,37 @@ from decimal import Decimal
 
 from app.catalog.importer import ParsedRow, import_parsed
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    from sqlalchemy import select
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def setup_base(db):
-    supplier = Supplier(name="Bolid")
-    level = PriceLevel(name="Розница")
+    org = _get_or_create_org(db)
+    supplier = Supplier(name="Bolid", org_id=org.id)
+    level = PriceLevel(name="Розница", org_id=org.id)
     db.add_all([supplier, level])
     db.commit()
-    return supplier, level
+    return supplier, level, org
 
 
 def test_first_import_creates_everything(db_session):
-    supplier, level = setup_base(db_session)
+    supplier, level, org = setup_base(db_session)
     parsed = [
         ParsedRow(name="Сириус", article="1-520-887", prices={level.id: Decimal("36159.53")}),
         ParsedRow(name="С2000-М", article="110-058", prices={level.id: Decimal("12721.31")}),
     ]
-    summary = import_parsed(db_session, supplier.id, "bolid.xlsx", parsed, kind="material")
+    summary = import_parsed(
+        db_session, supplier.id, "bolid.xlsx", parsed, kind="material", org_id=org.id
+    )
     assert summary.version == 1
     assert summary.items_created == 2
     assert summary.items_updated == 0
@@ -29,13 +43,14 @@ def test_first_import_creates_everything(db_session):
 
 
 def test_second_import_new_version_and_delta(db_session):
-    supplier, level = setup_base(db_session)
+    supplier, level, org = setup_base(db_session)
     import_parsed(
         db_session,
         supplier.id,
         "v1.xlsx",
         [ParsedRow(name="Сириус", article="A1", prices={level.id: Decimal("100.00")})],
         kind="material",
+        org_id=org.id,
     )
     summary = import_parsed(
         db_session,
@@ -46,6 +61,7 @@ def test_second_import_new_version_and_delta(db_session):
             ParsedRow(name="Новый", article="A2", prices={level.id: Decimal("50.00")}),
         ],
         kind="material",
+        org_id=org.id,
     )
     assert summary.version == 2
     assert summary.items_created == 1
@@ -57,13 +73,14 @@ def test_second_import_new_version_and_delta(db_session):
 
 
 def test_upsert_by_name_when_no_article(db_session):
-    supplier, level = setup_base(db_session)
+    supplier, level, org = setup_base(db_session)
     import_parsed(
         db_session,
         supplier.id,
         "w1.xlsx",
         [ParsedRow(name="Монтаж камеры", prices={level.id: Decimal("3500")})],
         kind="work",
+        org_id=org.id,
     )
     import_parsed(
         db_session,
@@ -71,6 +88,7 @@ def test_upsert_by_name_when_no_article(db_session):
         "w2.xlsx",
         [ParsedRow(name="Монтаж камеры", prices={level.id: Decimal("3700")})],
         kind="work",
+        org_id=org.id,
     )
     items = db_session.query(CatalogItem).all()
     assert len(items) == 1
@@ -78,23 +96,25 @@ def test_upsert_by_name_when_no_article(db_session):
 
 
 def test_rows_with_problems_are_skipped(db_session):
-    supplier, level = setup_base(db_session)
+    supplier, level, org = setup_base(db_session)
     parsed = [
         ParsedRow(name="Норм", article="A1", prices={level.id: Decimal("10")}),
         ParsedRow(name="Битый", article="A2", problems=["Нет ни одной цены"]),
     ]
-    summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material")
+    summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material",
+                            org_id=org.id)
     assert summary.items_created == 1
     assert summary.rows_skipped == 1
 
 
 def test_duplicate_rows_in_one_file_skipped(db_session):
-    supplier, level = setup_base(db_session)
+    supplier, level, org = setup_base(db_session)
     parsed = [
         ParsedRow(name="Сириус", article="A1", prices={level.id: Decimal("100.00")}),
         ParsedRow(name="Сириус дубль", article="A1", prices={level.id: Decimal("200.00")}),
     ]
-    summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material")
+    summary = import_parsed(db_session, supplier.id, "f.xlsx", parsed, kind="material",
+                            org_id=org.id)
     assert summary.items_created == 1
     assert summary.rows_skipped == 1
     assert summary.prices_written == 1

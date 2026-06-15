@@ -1,7 +1,19 @@
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.catalog.models import CatalogItem, Supplier
 from app.catalog.service import search_items
 from app.core.security import create_access_token
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _hdr(u):
@@ -9,12 +21,17 @@ def _hdr(u):
 
 
 def _items(db):
-    sup = Supplier(name="S"); db.add(sup); db.commit()
+    org = _get_or_create_org(db)
+    sup = Supplier(name="S", org_id=org.id); db.add(sup); db.commit()
     db.add_all([
-        CatalogItem(supplier_id=sup.id, name="Камера A", article="1", unit="шт", kind="material",
-                    characteristics={"Разрешение": "2 Мп", "Питание": "PoE"}),
-        CatalogItem(supplier_id=sup.id, name="Камера B", article="2", unit="шт", kind="material",
-                    characteristics={"Разрешение": "4 Мп", "Питание": "PoE"}),
+        CatalogItem(
+            supplier_id=sup.id, name="Камера A", article="1", unit="шт", kind="material",
+            characteristics={"Разрешение": "2 Мп", "Питание": "PoE"}, org_id=org.id
+        ),
+        CatalogItem(
+            supplier_id=sup.id, name="Камера B", article="2", unit="шт", kind="material",
+            characteristics={"Разрешение": "4 Мп", "Питание": "PoE"}, org_id=org.id
+        ),
     ])
     db.commit(); return sup
 
@@ -26,7 +43,8 @@ def test_search_items_facet_filter(db_session):
 
 
 def test_facets_endpoint_aggregates(client, db_session):
-    u = User(email="u@x.ru", name="U", role="estimator", status="active")
+    org = _get_or_create_org(db_session)
+    u = User(email="u@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
     _items(db_session)
     body = client.get("/api/catalog/facets", headers=_hdr(u)).json()
@@ -35,7 +53,8 @@ def test_facets_endpoint_aggregates(client, db_session):
 
 
 def test_items_endpoint_facet_param(client, db_session):
-    u = User(email="u2@x.ru", name="U", role="estimator", status="active")
+    org = _get_or_create_org(db_session)
+    u = User(email="u2@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
     _items(db_session)
     body = client.get("/api/catalog/items?f=Разрешение=4 Мп", headers=_hdr(u)).json()

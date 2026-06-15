@@ -38,15 +38,18 @@ def _section(client, u):
 
 
 def _catalog_item(db, kind="material", price="150.00"):
-    sup = Supplier(name="P")
+    org = _get_org(db)
+    sup = Supplier(name="P", org_id=org.id)
     db.add(sup)
     db.commit()
-    item = CatalogItem(supplier_id=sup.id, name="Камера 4Мп", article="A", unit="шт", kind=kind)
+    item = CatalogItem(
+        supplier_id=sup.id, name="Камера 4Мп", article="A", unit="шт", kind=kind, org_id=org.id
+    )
     db.add(item)
-    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1)
+    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1, org_id=org.id)
     db.add(pl)
     db.commit()
-    lvl = PriceLevel(name="Розница", sort_order=0)
+    lvl = PriceLevel(name="Розница", sort_order=0, org_id=org.id)
     db.add(lvl)
     db.commit()
     db.add(

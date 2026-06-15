@@ -154,14 +154,17 @@ def _build_row(row, mapping, name, current_category, default_category, prices,
     )
 
 
-def _latest_prices(db: Session, supplier_id: int) -> dict[tuple[int, int], Decimal]:
+def _latest_prices(
+    db: Session, supplier_id: int, org_id: int | None = None
+) -> dict[tuple[int, int], Decimal]:
     """{(item_id, level_id): value} из последнего прайс-листа поставщика."""
-    last = db.scalar(
+    q = (
         select(PriceList)
         .where(PriceList.supplier_id == supplier_id)
-        .order_by(PriceList.version.desc())
-        .limit(1)
     )
+    if org_id is not None:
+        q = q.where(PriceList.org_id == org_id)
+    last = db.scalar(q.order_by(PriceList.version.desc()).limit(1))
     if last is None:
         return {}
     rows = db.execute(
@@ -172,9 +175,13 @@ def _latest_prices(db: Session, supplier_id: int) -> dict[tuple[int, int], Decim
     return {(item_id, level_id): value for item_id, level_id, value in rows}
 
 
-def _find_item(db: Session, supplier_id: int, row: ParsedRow) -> CatalogItem | None:
+def _find_item(
+    db: Session, supplier_id: int, row: ParsedRow, org_id: int | None = None
+) -> CatalogItem | None:
     """Upsert-ключ: артикул, если он есть, иначе имя (см. комментарий в models.CatalogItem)."""
     query = select(CatalogItem).where(CatalogItem.supplier_id == supplier_id)
+    if org_id is not None:
+        query = query.where(CatalogItem.org_id == org_id)
     if row.article:
         query = query.where(CatalogItem.article == row.article)
     else:
@@ -188,15 +195,15 @@ def import_parsed(
     filename: str,
     parsed: list[ParsedRow],
     kind: str,
+    org_id: int | None = None,
 ) -> ImportSummary:
-    previous = _latest_prices(db, supplier_id)
-    version = (
-        db.scalar(
-            select(func.max(PriceList.version)).where(PriceList.supplier_id == supplier_id)
-        )
-        or 0
-    ) + 1
-    price_list = PriceList(supplier_id=supplier_id, filename=filename, version=version)
+    previous = _latest_prices(db, supplier_id, org_id=org_id)
+    q = select(func.max(PriceList.version)).where(PriceList.supplier_id == supplier_id)
+    if org_id is not None:
+        q = q.where(PriceList.org_id == org_id)
+    version = (db.scalar(q) or 0) + 1
+    price_list = PriceList(supplier_id=supplier_id, filename=filename, version=version,
+                           **({"org_id": org_id} if org_id is not None else {}))
     db.add(price_list)
     db.flush()
 
@@ -214,9 +221,9 @@ def import_parsed(
             summary.problems.append(f"{row.name}: {'; '.join(row.problems)}")
             continue
         seen_keys.add(key)
-        item = _find_item(db, supplier_id, row)
+        item = _find_item(db, supplier_id, row, org_id=org_id)
         if item is None:
-            item = CatalogItem(
+            item_kwargs: dict = dict(
                 supplier_id=supplier_id,
                 name=row.name,
                 article=row.article,
@@ -227,6 +234,9 @@ def import_parsed(
                 price_on_request=row.price_on_request,
                 characteristics_raw=row.characteristics or None,
             )
+            if org_id is not None:
+                item_kwargs["org_id"] = org_id
+            item = CatalogItem(**item_kwargs)
             db.add(item)
             db.flush()
             summary.items_created += 1

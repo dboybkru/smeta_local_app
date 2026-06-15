@@ -61,7 +61,9 @@ def build_context(estimate: em.Estimate) -> str:
     return "\n".join(lines)
 
 
-def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]]:
+def _candidates(
+    db: Session, queries: list[str], org_id: int | None = None
+) -> tuple[str, list[CatalogItem]]:
     seen: dict[int, CatalogItem] = {}
 
     def _add(found: list[CatalogItem]) -> None:
@@ -71,7 +73,7 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
 
     for q in (queries or [])[:_MAX_QUERIES]:
         items, _ = catalog_service.search_items(
-            db, q=q, limit=_PER_QUERY, in_characteristics=True
+            db, q=q, limit=_PER_QUERY, in_characteristics=True, org_id=org_id
         )
         if not items and len(q.split()) > 1:
             # запрос слишком конкретный (характеристики/бренд в названии нет) —
@@ -80,7 +82,7 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
                 if len(word) < 3:
                     continue
                 _add(catalog_service.search_items(
-                    db, q=word, limit=_PER_QUERY, in_characteristics=True)[0])
+                    db, q=word, limit=_PER_QUERY, in_characteristics=True, org_id=org_id)[0])
                 if len(seen) >= _MAX_CANDIDATES:
                     break
         else:
@@ -92,7 +94,7 @@ def _candidates(db: Session, queries: list[str]) -> tuple[str, list[CatalogItem]
         return "(каталог: подходящих позиций не найдено)", items
     rows = []
     for it in items:
-        work, material, _ = est_service.snapshot_line_values(db, it, None)
+        work, material, _ = est_service.snapshot_line_values(db, it, None, org_id=org_id)
         price = work + material
         chars = ""
         if it.characteristics:
@@ -121,6 +123,7 @@ def _parse_ops(raw: object) -> list:
 def run_assistant(
     db: Session, estimate: em.Estimate, messages: list[schemas.ChatMessage]
 ) -> schemas.ChatResponse:
+    org_id = estimate.org_id
     context = build_context(estimate)
     convo = [{"role": m.role, "content": m.content} for m in messages]
 
@@ -144,7 +147,7 @@ def run_assistant(
     )
     queries = step1.get("queries", []) if isinstance(step1, dict) else []
 
-    cand_text, _ = _candidates(db, queries)
+    cand_text, _ = _candidates(db, queries, org_id=org_id)
 
     # Шаг 2 — ответ + changeset
     ops_prompt = (
@@ -207,6 +210,7 @@ def _section_in(estimate: em.Estimate, section_id: int) -> em.EstimateSection:
 
 def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> None:
     """Атомарно применяет операции к смете. При любой ошибке — откат всего пакета."""
+    org_id = estimate.org_id
     branch = est_service.base_branch(estimate)
     client = db.get(em.Client, estimate.client_id) if estimate.client_id else None
     # карта имя→раздел: существующие + созданные в этом пакете
@@ -245,7 +249,9 @@ def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> Non
                 item = db.get(CatalogItem, op.catalog_item_id)
                 if item is None:
                     raise ApplyError(f"Позиция каталога #{op.catalog_item_id} не найдена")
-                work, material, purchase = est_service.snapshot_line_values(db, item, client)
+                work, material, purchase = est_service.snapshot_line_values(
+                    db, item, client, org_id=org_id
+                )
                 db.add(em.EstimateLine(
                     section_id=sec.id, item_id=item.id, name=item.name, unit=item.unit,
                     qty=op.qty, work_price=work, material_price=material,

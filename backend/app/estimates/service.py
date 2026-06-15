@@ -50,7 +50,13 @@ def get_client_for_org(db: Session, client_id: int, org_id: int) -> models.Clien
 
 
 def create_client(db: Session, data: "schemas.ClientIn", org_id: int) -> models.Client:
-    client = models.Client(**data.model_dump(), org_id=org_id)
+    dumped = data.model_dump()
+    price_level_id = dumped.get("default_price_level_id")
+    if price_level_id is not None:
+        level = db.get(PriceLevel, price_level_id)
+        if level is None or level.org_id != org_id:
+            raise HTTPException(status_code=404, detail="Уровень цен не найден")
+    client = models.Client(**dumped, org_id=org_id)
     db.add(client)
     db.commit()
     db.refresh(client)
@@ -159,24 +165,28 @@ def snapshot_line_values(
     db: Session,
     item: CatalogItem,
     client: models.Client | None,
+    org_id: int | None = None,
 ) -> tuple[Decimal, Decimal, Decimal | None]:
     """Возвращает (work_price, material_price, purchase_price_snapshot).
 
     Цены фиксируются на момент добавления позиции.
+    org_id используется для скоупинга уровней цен в рамках org.
     """
     prices = latest_prices_for(db, [item.id]).get(item.id, {})
 
     sell_level_id = client.default_price_level_id if client else None
     if sell_level_id is None:
-        first = db.scalars(
-            select(PriceLevel).order_by(PriceLevel.sort_order, PriceLevel.id)
-        ).first()
+        q = select(PriceLevel).order_by(PriceLevel.sort_order, PriceLevel.id)
+        if org_id is not None:
+            q = q.where(PriceLevel.org_id == org_id)
+        first = db.scalars(q).first()
         sell_level_id = first.id if first else None
     sell = prices.get(sell_level_id, Decimal("0")) if sell_level_id is not None else Decimal("0")
 
-    zakupka = db.scalars(
-        select(PriceLevel).where(PriceLevel.name == ZAKUPKA_LEVEL_NAME)
-    ).first()
+    q_zak = select(PriceLevel).where(PriceLevel.name == ZAKUPKA_LEVEL_NAME)
+    if org_id is not None:
+        q_zak = q_zak.where(PriceLevel.org_id == org_id)
+    zakupka = db.scalars(q_zak).first()
     purchase = prices.get(zakupka.id) if zakupka is not None else None
 
     if item.kind == "work":

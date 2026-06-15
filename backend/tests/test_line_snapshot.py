@@ -19,17 +19,20 @@ def _get_org(db):
 
 def _catalog(db, kind="material", prices=None):
     """prices: {level_name: value}. Создаёт поставщика, позицию, уровни, прайс-лист, цены."""
-    sup = Supplier(name="Поставщик")
+    org = _get_org(db)
+    sup = Supplier(name="Поставщик", org_id=org.id)
     db.add(sup)
     db.commit()
-    item = CatalogItem(supplier_id=sup.id, name="Камера", article="A1", unit="шт", kind=kind)
+    item = CatalogItem(
+        supplier_id=sup.id, name="Камера", article="A1", unit="шт", kind=kind, org_id=org.id
+    )
     db.add(item)
-    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1)
+    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1, org_id=org.id)
     db.add(pl)
     db.commit()
     levels = {}
     for i, (lname, value) in enumerate((prices or {}).items()):
-        lvl = PriceLevel(name=lname, sort_order=i)
+        lvl = PriceLevel(name=lname, sort_order=i, org_id=org.id)
         db.add(lvl)
         db.commit()
         levels[lname] = lvl

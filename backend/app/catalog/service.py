@@ -24,8 +24,11 @@ def search_items(
     offset: int = 0,
     facets: dict[str, str] | None = None,
     in_characteristics: bool = False,
+    org_id: int | None = None,
 ) -> tuple[list[CatalogItem], int]:
     query = select(CatalogItem)
+    if org_id is not None:
+        query = query.where(CatalogItem.org_id == org_id)
     for token in search.tokens(q):
         # токен matches, если ЛЮБОЙ его раскладочный вариант — подстрока name/article
         # (а при in_characteristics — ещё и сырья характеристик: для ассистента,
