@@ -7,13 +7,13 @@ TOKEN_URL = "https://oauth.yandex.ru/token"
 USERINFO_URL = "https://login.yandex.ru/info"
 
 
-def build_authorize_url(state: str) -> str:
+def build_authorize_url(state: str, client_id: str) -> str:
     from urllib.parse import urlencode
 
     params = urlencode(
         {
             "response_type": "code",
-            "client_id": settings.yandex_client_id,
+            "client_id": client_id,
             "redirect_uri": f"{settings.backend_url}/api/auth/yandex/callback",
             "state": state,
         }
@@ -21,14 +21,14 @@ def build_authorize_url(state: str) -> str:
     return f"{AUTHORIZE_URL}?{params}"
 
 
-def exchange_code(code: str) -> str:
+def exchange_code(code: str, client_id: str, client_secret: str) -> str:
     resp = httpx.post(
         TOKEN_URL,
         data={
             "grant_type": "authorization_code",
             "code": code,
-            "client_id": settings.yandex_client_id,
-            "client_secret": settings.yandex_client_secret,
+            "client_id": client_id,
+            "client_secret": client_secret,
         },
         timeout=10.0,
     )

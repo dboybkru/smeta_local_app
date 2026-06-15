@@ -12,8 +12,19 @@ from app.auth.schemas import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import InvalidTokenError, decode_token
+from app.settings import service as settings_service
+from app.settings.router import YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _yandex_creds(db: Session) -> tuple[str, str]:
+    """Возвращает (client_id, client_secret): DB-значение или env-фолбэк."""
+    client_id = settings_service.get_secret(db, YANDEX_CLIENT_ID) or settings.yandex_client_id
+    client_secret = (
+        settings_service.get_secret(db, YANDEX_CLIENT_SECRET) or settings.yandex_client_secret
+    )
+    return client_id, client_secret
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
@@ -59,16 +70,18 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
 
 
 @router.get("/config")
-def auth_config():
-    return {"yandex_enabled": bool(settings.yandex_client_id)}
+def auth_config(db: Session = Depends(get_db)):
+    cid, _ = _yandex_creds(db)
+    return {"yandex_enabled": bool(cid)}
 
 
 @router.get("/yandex/login")
-def yandex_login():
-    if not settings.yandex_client_id:
+def yandex_login(db: Session = Depends(get_db)):
+    cid, _ = _yandex_creds(db)
+    if not cid:
         raise HTTPException(status_code=503, detail="Вход через Яндекс не настроен")
     state = secrets.token_urlsafe(24)
-    resp = RedirectResponse(yandex.build_authorize_url(state))
+    resp = RedirectResponse(yandex.build_authorize_url(state, cid))
     resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax", secure=True)
     return resp
 
@@ -77,8 +90,9 @@ def yandex_login():
 def yandex_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
     if state != request.cookies.get("yx_state"):
         raise HTTPException(status_code=400, detail="Неверный state")
+    cid, secret = _yandex_creds(db)
     try:
-        token = yandex.exchange_code(code)
+        token = yandex.exchange_code(code, cid, secret)
         info = yandex.fetch_userinfo(token)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail="Ошибка авторизации через Яндекс") from exc
