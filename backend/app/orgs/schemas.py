@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class OrgIn(BaseModel):
@@ -11,3 +11,13 @@ class OrgOut(BaseModel):
     id: int
     name: str
     user_count: int = 0
+
+
+class InviteIn(BaseModel):
+    email: EmailStr
+    role: str = "estimator"
+
+
+class UpdateUserIn(BaseModel):
+    role: str | None = None
+    status: str | None = None

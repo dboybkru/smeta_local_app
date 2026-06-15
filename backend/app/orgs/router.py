@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_org_admin, require_superuser
-from app.auth.models import User
+from app.auth.models import ROLES, User
 from app.core.db import get_db
 from app.orgs import service
 from app.orgs.models import Organization
-from app.orgs.schemas import OrgIn, OrgOut
+from app.orgs.schemas import InviteIn, OrgIn, OrgOut, UpdateUserIn
 
 router = APIRouter(prefix="/api/orgs", tags=["orgs"])
 
@@ -48,13 +48,11 @@ def rename_org(
 # User-management endpoints (org_admin scope)
 # ---------------------------------------------------------------------------
 
-_VALID_ROLES = ("org_admin", "estimator", "viewer")
-
 
 @router.post("/{org_id}/users", status_code=201)
 def invite_user(
     org_id: int,
-    body: dict,
+    body: InviteIn,
     db: Session = Depends(get_db),
     actor: User = Depends(require_org_admin),
 ):
@@ -62,9 +60,9 @@ def invite_user(
         raise HTTPException(status_code=403, detail="Чужая организация")
     if db.get(Organization, org_id) is None:
         raise HTTPException(status_code=404, detail="Организация не найдена")
-    email = (body.get("email") or "").strip().lower()
-    role = body.get("role") or "estimator"
-    if not email or role not in _VALID_ROLES:
+    email = str(body.email).strip().lower()
+    role = body.role
+    if role not in ROLES:
         raise HTTPException(status_code=422, detail="email и валидная роль обязательны")
     if db.scalar(select(User).where(User.email == email)) is not None:
         raise HTTPException(status_code=409, detail="Пользователь с таким email уже есть")
@@ -96,7 +94,7 @@ def list_org_users(
 def update_org_user(
     org_id: int,
     uid: int,
-    body: dict,
+    body: UpdateUserIn,
     db: Session = Depends(get_db),
     actor: User = Depends(require_org_admin),
 ):
@@ -105,9 +103,10 @@ def update_org_user(
     u = db.get(User, uid)
     if u is None or u.org_id != org_id:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
-    if (role := body.get("role")) in _VALID_ROLES:
-        u.role = role
-    if (status := body.get("status")) in ("active", "blocked"):
-        u.status = status
+    if body.role in ROLES:
+        u.role = body.role
+    if body.status in ("active", "blocked"):
+        u.status = body.status
     db.commit()
+    db.refresh(u)
     return {"id": u.id, "email": u.email, "role": u.role, "status": u.status}

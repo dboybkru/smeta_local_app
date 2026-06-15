@@ -43,3 +43,30 @@ def test_self_register_without_invite_is_pending_orgless(client, db_session):
     assert r.status_code in (200, 201)
     u = db_session.scalars(sa.select(User).where(User.email == "self@x.ru")).one()
     assert u.status == "pending" and u.org_id is None
+
+
+def test_yandex_claim_invited_user(db_session):
+    """Яндекс-вход по email должен «забирать» приглашённого пользователя."""
+    from app.auth.service import get_or_create_yandex_user
+
+    o = Organization(name="OrgY")
+    db_session.add(o)
+    db_session.commit()
+
+    invited = User(
+        email="yaclaim@example.ru",
+        role="viewer",
+        status="invited",
+        org_id=o.id,
+        name="",
+    )
+    db_session.add(invited)
+    db_session.commit()
+
+    info = {"id": "yx-claim-999", "default_email": "yaclaim@example.ru", "real_name": "Яша"}
+    user = get_or_create_yandex_user(db_session, info)
+
+    assert user.status == "active"
+    assert user.yandex_id == "yx-claim-999"
+    assert user.org_id == o.id
+    assert user.role == "viewer"
