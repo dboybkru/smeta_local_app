@@ -202,3 +202,53 @@ def test_apply_changeset_atomic_rollback_on_bad_ref(db_session):
     db_session.rollback()
     db_session.refresh(est)
     assert len(est.branches[0].sections) == 0  # раздел не создан (откат)
+
+
+def test_apply_changeset_cross_org_catalog_item_rejected(db_session):
+    """apply_changeset must reject a catalog_item_id that belongs to a different org."""
+    from sqlalchemy import select
+
+    from app.auth.models import User
+    from app.catalog.models import CatalogItem, Supplier
+    from app.estimates import models as em
+    from app.orgs.models import Organization
+
+    # org A owns the catalog item
+    org_a = Organization(name="OrgA_apply")
+    db_session.add(org_a)
+    db_session.commit()
+    sup_a = Supplier(name="SupA_apply", org_id=org_a.id)
+    db_session.add(sup_a)
+    db_session.commit()
+    foreign_item = CatalogItem(
+        supplier_id=sup_a.id, name="Чужая позиция", article="FA",
+        unit="шт", kind="material", org_id=org_a.id,
+    )
+    db_session.add(foreign_item)
+    db_session.commit()
+
+    # org B owns the estimate
+    org_b = Organization(name="OrgB_apply")
+    db_session.add(org_b)
+    db_session.commit()
+    u_b = User(email="apply_b@x.ru", name="B", role="estimator", status="active", org_id=org_b.id)
+    db_session.add(u_b)
+    db_session.commit()
+    est_b = em.Estimate(owner_id=u_b.id, org_id=org_b.id, object_name="Объект Б apply")
+    db_session.add(est_b)
+    db_session.commit()
+    br_b = em.EstimateBranch(estimate_id=est_b.id, name="Базовая")
+    db_session.add(br_b)
+    db_session.commit()
+    db_session.refresh(est_b)
+
+    # changeset references org A's item → must raise ApplyError (caught as Exception)
+    with pytest.raises(Exception):
+        asvc.apply_changeset(db_session, est_b, [
+            schemas.AddSection(op="add_section", name="Оборудование"),
+            schemas.AddCatalogLine(
+                op="add_catalog_line", section_name="Оборудование",
+                catalog_item_id=foreign_item.id, qty=Decimal("1"),
+            ),
+        ])
+    db_session.rollback()

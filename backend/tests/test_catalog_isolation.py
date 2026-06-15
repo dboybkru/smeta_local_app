@@ -122,3 +122,54 @@ def test_client_cross_org_price_level_rejected(client, db_session):
         headers=_hdr(ub),
     )
     assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
+
+
+def test_update_client_cross_org_price_level_rejected(client, db_session):
+    """PATCH-ing a client with another org's default_price_level_id must 404."""
+    from app.catalog.models import PriceLevel as PL
+
+    oa, ua = _org_admin(db_session, "UPL_A")
+    ob, ub = _org_admin(db_session, "UPL_B")
+    level_a = PL(name="Розница", org_id=oa.id)
+    db_session.add(level_a)
+    db_session.commit()
+    # org B creates its own client first
+    r = client.post("/api/clients", json={"name": "Клиент Б"}, headers=_hdr(ub))
+    assert r.status_code == 201, r.text
+    client_b_id = r.json()["id"]
+    # org B tries to patch the client referencing org A's price level
+    r = client.patch(
+        f"/api/clients/{client_b_id}",
+        json={"default_price_level_id": level_a.id},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
+
+
+def test_add_line_cross_org_item_rejected(client, db_session):
+    """POST add-line with another org's catalog item_id must return 404."""
+    from app.catalog.models import CatalogItem as CI, Supplier as Sup
+
+    # org A has a supplier and catalog item
+    oa, ua = _org_admin(db_session, "ALI_A")
+    ob, ub = _org_admin(db_session, "ALI_B")
+    sup_a = Sup(name="SupA", org_id=oa.id)
+    db_session.add(sup_a)
+    db_session.commit()
+    item_a = CI(supplier_id=sup_a.id, org_id=oa.id, name="Секретная камера", kind="material")
+    db_session.add(item_a)
+    db_session.commit()
+
+    # org B creates an estimate and section
+    est_b = client.post("/api/estimates", json={"object_name": "Объект Б"}, headers=_hdr(ub)).json()
+    sec_b = client.post(
+        f"/api/estimates/{est_b['id']}/sections", json={"name": "Раздел Б"}, headers=_hdr(ub)
+    ).json()
+
+    # org B tries to add a line referencing org A's item → must be 404
+    r = client.post(
+        f"/api/sections/{sec_b['id']}/lines",
+        json={"item_id": item_a.id, "qty": "1"},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
