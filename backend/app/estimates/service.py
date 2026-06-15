@@ -70,6 +70,8 @@ def get_owned_section(db: Session, section_id: int, user: User) -> models.Estima
     if section is None:
         raise HTTPException(status_code=404, detail="Раздел не найден")
     est = section.branch.estimate
+    if est is None or est.org_id != user.org_id:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
     if user.role == "estimator" and est.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Раздел не найден")
     return section
@@ -80,6 +82,8 @@ def get_owned_line(db: Session, line_id: int, user: User) -> models.EstimateLine
     if line is None:
         raise HTTPException(status_code=404, detail="Строка не найдена")
     est = line.section.branch.estimate
+    if est is None or est.org_id != user.org_id:
+        raise HTTPException(status_code=404, detail="Строка не найдена")
     if user.role == "estimator" and est.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Строка не найдена")
     return line
