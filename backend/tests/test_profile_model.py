@@ -1,20 +1,20 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.models import User
+from app.orgs.models import Organization
 from app.profile.models import CompanyProfile
 
 
-def _user(db_session, email="u@x.ru"):
-    u = User(email=email, name="U", role="estimator", status="active")
-    db_session.add(u)
+def _org(db_session, name="TestOrg"):
+    o = Organization(name=name)
+    db_session.add(o)
     db_session.commit()
-    return u
+    return o
 
 
 def test_profile_defaults(db_session):
-    u = _user(db_session)
-    p = CompanyProfile(user_id=u.id, org_name="ООО Ромашка")
+    o = _org(db_session)
+    p = CompanyProfile(org_id=o.id, org_name="ООО Ромашка")
     db_session.add(p)
     db_session.commit()
     db_session.refresh(p)
@@ -25,10 +25,10 @@ def test_profile_defaults(db_session):
     assert p.inn == ""
 
 
-def test_profile_unique_per_user(db_session):
-    u = _user(db_session)
-    db_session.add(CompanyProfile(user_id=u.id))
+def test_profile_unique_per_org(db_session):
+    o = _org(db_session, "UniqueOrg")
+    db_session.add(CompanyProfile(org_id=o.id))
     db_session.commit()
-    db_session.add(CompanyProfile(user_id=u.id))
+    db_session.add(CompanyProfile(org_id=o.id))
     with pytest.raises(IntegrityError):
         db_session.commit()

@@ -4,7 +4,7 @@ from app.settings import service as settings_service
 
 
 def _admin(db):
-    u = User(email="a@x.ru", name="A", role="org_admin", status="active")
+    u = User(email="a@x.ru", name="A", role="org_admin", status="active", is_superuser=True)
     db.add(u); db.commit(); return u
 
 

@@ -36,7 +36,7 @@ def _estimate_with_lines(db_session):
     db_session.add(est)
     db_session.commit()
     db_session.refresh(est)
-    profile = CompanyProfile(user_id=u.id, org_name="ООО Ромашка",
+    profile = CompanyProfile(org_id=org.id, org_name="ООО Ромашка",
                              utp=["Гарантия 5 лет"], guarantee="5 лет")
     db_session.add(profile)
     db_session.commit()

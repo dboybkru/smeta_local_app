@@ -1,9 +1,19 @@
 from app.auth.models import User
 from app.core.security import create_access_token
+from app.orgs.models import Organization
 
 
-def _user(db_session, role="estimator", email=None):
-    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active")
+def _org(db_session, name="TestOrg"):
+    o = Organization(name=name)
+    db_session.add(o)
+    db_session.commit()
+    return o
+
+
+def _user(db_session, role="org_admin", email=None, org=None):
+    if org is None:
+        org = _org(db_session)
+    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
     return u
