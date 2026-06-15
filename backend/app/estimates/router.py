@@ -84,6 +84,8 @@ def create_estimate(
 ):
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
+    if body.client_id is not None:
+        service.get_client_for_org(db, body.client_id, org_id)
     est = models.Estimate(
         owner_id=user.id,
         org_id=org_id,
@@ -113,10 +115,14 @@ def patch_estimate(
     body: schemas.EstimatePatch,
     db: Session = Depends(get_db),
     user: User = Depends(require_active),
+    org_id: int = Depends(current_org),
 ):
     est = service.get_owned_estimate(db, estimate_id, user)
     service.require_write(est, user)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    patch_data = body.model_dump(exclude_unset=True)
+    if patch_data.get("client_id") is not None:
+        service.get_client_for_org(db, patch_data["client_id"], org_id)
+    for field, value in patch_data.items():
         setattr(est, field, value)
     db.commit()
     db.refresh(est)
