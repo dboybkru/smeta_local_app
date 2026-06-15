@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_superuser
+from app.auth.deps import require_org_admin, require_superuser
 from app.auth.models import User
 from app.core.db import get_db
 from app.orgs import service
@@ -42,3 +42,72 @@ def rename_org(
     org.name = body.name
     db.commit()
     return {"id": org.id, "name": org.name, "user_count": service.count_users(db, org.id)}
+
+
+# ---------------------------------------------------------------------------
+# User-management endpoints (org_admin scope)
+# ---------------------------------------------------------------------------
+
+_VALID_ROLES = ("org_admin", "estimator", "viewer")
+
+
+@router.post("/{org_id}/users", status_code=201)
+def invite_user(
+    org_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_org_admin),
+):
+    if not actor.is_superuser and actor.org_id != org_id:
+        raise HTTPException(status_code=403, detail="Чужая организация")
+    if db.get(Organization, org_id) is None:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+    email = (body.get("email") or "").strip().lower()
+    role = body.get("role") or "estimator"
+    if not email or role not in _VALID_ROLES:
+        raise HTTPException(status_code=422, detail="email и валидная роль обязательны")
+    if db.scalar(select(User).where(User.email == email)) is not None:
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже есть")
+    u = User(email=email, role=role, status="invited", org_id=org_id, name="")
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {"id": u.id, "email": u.email, "role": u.role, "status": u.status}
+
+
+@router.get("/{org_id}/users")
+def list_org_users(
+    org_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_org_admin),
+):
+    if not actor.is_superuser and actor.org_id != org_id:
+        raise HTTPException(status_code=403, detail="Чужая организация")
+    rows = db.scalars(
+        select(User).where(User.org_id == org_id).order_by(User.email)
+    ).all()
+    return [
+        {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "status": u.status}
+        for u in rows
+    ]
+
+
+@router.patch("/{org_id}/users/{uid}")
+def update_org_user(
+    org_id: int,
+    uid: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_org_admin),
+):
+    if not actor.is_superuser and actor.org_id != org_id:
+        raise HTTPException(status_code=403, detail="Чужая организация")
+    u = db.get(User, uid)
+    if u is None or u.org_id != org_id:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if (role := body.get("role")) in _VALID_ROLES:
+        u.role = role
+    if (status := body.get("status")) in ("active", "blocked"):
+        u.status = status
+    db.commit()
+    return {"id": u.id, "email": u.email, "role": u.role, "status": u.status}

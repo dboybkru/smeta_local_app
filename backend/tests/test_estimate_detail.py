@@ -82,7 +82,7 @@ def test_owner_sees_margin(client, db_session):
 
 def test_admin_sees_margin_of_others(client, db_session):
     u = _user(db_session, email="owner@x.ru")
-    admin = _user(db_session, role="admin", email="adm@x.ru")
+    admin = _user(db_session, role="org_admin", email="adm@x.ru")
     eid = _build(client, u, db_session)
     body = client.get(f"/api/estimates/{eid}", headers=_hdr(admin)).json()
     assert body["totals"]["margin"] == "100.00"

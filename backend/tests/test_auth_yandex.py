@@ -48,7 +48,7 @@ def test_yandex_callback_creates_user_and_redirects(client):
     access = dict(p.split("=", 1) for p in fragment.split("&"))["access_token"]
     me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {access}"})
     assert me.json()["email"] == "ya@yandex.ru"
-    assert me.json()["role"] == "admin"
+    assert me.json()["role"] == "org_admin"
 
 
 def test_yandex_callback_bad_state_400(client):

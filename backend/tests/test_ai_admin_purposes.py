@@ -5,7 +5,7 @@ from app.core.security import create_access_token
 
 
 def _admin(db_session):
-    u = User(email="adm@x.ru", name="A", role="admin", status="active")
+    u = User(email="adm@x.ru", name="A", role="org_admin", status="active")
     db_session.add(u); db_session.commit(); return u
 
 
