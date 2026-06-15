@@ -4,21 +4,32 @@ from sqlalchemy import select
 
 from app.catalog.importer import ParsedRow, import_parsed
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, Supplier
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _supplier_level(db):
-    sup = Supplier(name="Опт-С"); db.add(sup); db.commit()
-    lvl = PriceLevel(name="Розница"); db.add(lvl); db.commit()
-    return sup, lvl
+    org = _get_or_create_org(db)
+    sup = Supplier(name="Опт-С", org_id=org.id); db.add(sup); db.commit()
+    lvl = PriceLevel(name="Розница", org_id=org.id); db.add(lvl); db.commit()
+    return sup, lvl, org
 
 
 def test_import_writes_manufacturer_and_on_request(db_session):
-    sup, lvl = _supplier_level(db_session)
+    sup, lvl, org = _supplier_level(db_session)
     parsed = [
         ParsedRow(name="Камера", article="A1", manufacturer="Optimus",
                   price_on_request=True, prices={lvl.id: Decimal("0.00")}),
     ]
-    import_parsed(db_session, sup.id, "p.xlsx", parsed, kind="material")
+    import_parsed(db_session, sup.id, "p.xlsx", parsed, kind="material", org_id=org.id)
     item = db_session.scalars(select(CatalogItem)).one()
     assert item.manufacturer == "Optimus"
     assert item.price_on_request is True
@@ -27,14 +38,14 @@ def test_import_writes_manufacturer_and_on_request(db_session):
 
 
 def test_import_updates_on_request_flag(db_session):
-    sup, lvl = _supplier_level(db_session)
+    sup, lvl, org = _supplier_level(db_session)
     import_parsed(db_session, sup.id, "p.xlsx",
                   [ParsedRow(name="К", article="A1", price_on_request=True,
-                             prices={lvl.id: Decimal("0")})], kind="material")
+                             prices={lvl.id: Decimal("0")})], kind="material", org_id=org.id)
     import_parsed(db_session, sup.id, "p2.xlsx",
                   [ParsedRow(name="К", article="A1", manufacturer="X",
                              price_on_request=False, prices={lvl.id: Decimal("99")})],
-                  kind="material")
+                  kind="material", org_id=org.id)
     item = db_session.scalars(select(CatalogItem)).one()
     assert item.price_on_request is False
     assert item.manufacturer == "X"

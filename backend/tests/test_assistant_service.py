@@ -38,8 +38,11 @@ def _estimate_with_catalog(db_session):
         db_session.commit()
     u = User(email="a@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
-    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
-    item = CatalogItem(supplier_id=sup.id, name="Камера IP", article="A", unit="шт", kind="material")
+    sup = Supplier(name="P", org_id=org.id); db_session.add(sup); db_session.commit()
+    item = CatalogItem(
+        supplier_id=sup.id, name="Камера IP", article="A", unit="шт", kind="material",
+        org_id=org.id,
+    )
     db_session.add(item); db_session.commit()
     est = em.Estimate(owner_id=u.id, org_id=org.id, object_name="Склад")
     db_session.add(est); db_session.commit()
@@ -152,10 +155,17 @@ def test_apply_changeset_set_qty_and_delete(db_session):
 
 
 def test_candidates_include_characteristics(db_session):
+    from sqlalchemy import select
+
     from app.catalog.models import CatalogItem, Supplier
-    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
+    from app.orgs.models import Organization
+
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg"); db_session.add(org); db_session.commit()
+    sup = Supplier(name="P", org_id=org.id); db_session.add(sup); db_session.commit()
     it = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material",
-                     characteristics={"Разрешение": "2 Мп"})
+                     characteristics={"Разрешение": "2 Мп"}, org_id=org.id)
     db_session.add(it); db_session.commit()
     text, items = asvc._candidates(db_session, ["камера"])
     assert "Разрешение" in text
@@ -164,10 +174,17 @@ def test_candidates_include_characteristics(db_session):
 def test_candidates_per_word_fallback_for_overspecified_query(db_session):
     # многословный запрос с характеристиками не совпадёт по названию целиком,
     # но переспрос по словам должен найти позицию по слову «камера»
+    from sqlalchemy import select
+
     from app.catalog.models import CatalogItem, Supplier
-    sup = Supplier(name="P2"); db_session.add(sup); db_session.commit()
+    from app.orgs.models import Organization
+
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg"); db_session.add(org); db_session.commit()
+    sup = Supplier(name="P2", org_id=org.id); db_session.add(sup); db_session.commit()
     it = CatalogItem(supplier_id=sup.id, name="Видеокамера Optimus IP-E014", article="B",
-                     unit="шт", kind="material")
+                     unit="шт", kind="material", org_id=org.id)
     db_session.add(it); db_session.commit()
     text, items = asvc._candidates(db_session, ["камера уличная 4мп с ик подсветкой"])
     assert any(i.id == it.id for i in items)

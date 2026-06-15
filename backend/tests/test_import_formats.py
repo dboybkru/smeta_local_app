@@ -6,6 +6,7 @@ from app.catalog import detect
 from app.catalog.importer import import_parsed, parse_rows
 from app.catalog.models import CatalogItem, PriceLevel, Supplier
 from app.catalog.schemas import ColumnMapping
+from app.orgs.models import Organization
 from tests.fixtures import pricelists as P
 
 
@@ -23,19 +24,29 @@ def _mapping_from_layout(layout, level_ids):
     )
 
 
+def _get_or_create_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
+
+
 def _setup(db, n_levels=3):
-    sup = Supplier(name="S"); db.add(sup); db.commit()
-    levels = [PriceLevel(name=f"L{i}", sort_order=i) for i in range(n_levels)]
+    org = _get_or_create_org(db)
+    sup = Supplier(name="S", org_id=org.id); db.add(sup); db.commit()
+    levels = [PriceLevel(name=f"L{i}", sort_order=i, org_id=org.id) for i in range(n_levels)]
     db.add_all(levels); db.commit()
-    return sup, [lvl.id for lvl in levels]
+    return sup, [lvl.id for lvl in levels], org
 
 
 def _run(db, rows, n_levels=3):
-    sup, lids = _setup(db, n_levels)
+    sup, lids, org = _setup(db, n_levels)
     layout = detect.detect_layout(rows)
     assert layout is not None
     parsed = parse_rows(rows, _mapping_from_layout(layout, lids))
-    import_parsed(db, sup.id, "p.xlsx", parsed, kind="material")
+    import_parsed(db, sup.id, "p.xlsx", parsed, kind="material", org_id=org.id)
     return db.scalars(select(CatalogItem).order_by(CatalogItem.id)).all()
 
 

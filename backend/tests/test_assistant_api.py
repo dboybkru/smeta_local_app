@@ -27,8 +27,10 @@ def _setup(db_session, role="estimator"):
     org = _get_org(db_session)
     u = User(email=f"{role}@x.ru", name="U", role=role, status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
-    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
-    item = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material")
+    sup = Supplier(name="P", org_id=org.id); db_session.add(sup); db_session.commit()
+    item = CatalogItem(
+        supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material", org_id=org.id
+    )
     db_session.add(item); db_session.commit()
     est = em.Estimate(owner_id=u.id, org_id=org.id, object_name="O")
     db_session.add(est); db_session.commit()

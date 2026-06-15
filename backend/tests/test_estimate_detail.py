@@ -30,18 +30,19 @@ def _hdr(u):
 
 
 def _catalog_item(db, price="150.00", purchase="100.00"):
-    sup = Supplier(name="P")
+    org = _get_org(db)
+    sup = Supplier(name="P", org_id=org.id)
     db.add(sup)
     db.commit()
     item = CatalogItem(
-        supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material"
+        supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material", org_id=org.id
     )
     db.add(item)
-    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1)
+    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1, org_id=org.id)
     db.add(pl)
     db.commit()
-    roz = PriceLevel(name="Розница", sort_order=0)
-    zak = PriceLevel(name="Закупка", sort_order=1)
+    roz = PriceLevel(name="Розница", sort_order=0, org_id=org.id)
+    zak = PriceLevel(name="Закупка", sort_order=1, org_id=org.id)
     db.add_all([roz, zak])
     db.commit()
     db.add_all([

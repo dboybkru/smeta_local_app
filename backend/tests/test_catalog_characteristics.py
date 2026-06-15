@@ -1,10 +1,22 @@
 from app.auth.models import User
 from app.catalog.models import CatalogItem, Supplier
 from app.core.security import create_access_token
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    from sqlalchemy import select
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def _admin(db):
-    u = User(email="a@x.ru", name="A", role="org_admin", status="active")
+    org = _get_or_create_org(db)
+    u = User(email="a@x.ru", name="A", role="org_admin", status="active", org_id=org.id)
     db.add(u); db.commit(); return u
 
 
@@ -13,8 +25,11 @@ def _hdr(u):
 
 
 def _item(db, name="Камера IP 2Мп PoE"):
-    sup = Supplier(name="P"); db.add(sup); db.commit()
-    it = CatalogItem(supplier_id=sup.id, name=name, article="A", unit="шт", kind="material")
+    org = _get_or_create_org(db)
+    sup = Supplier(name="P", org_id=org.id); db.add(sup); db.commit()
+    it = CatalogItem(
+        supplier_id=sup.id, name=name, article="A", unit="шт", kind="material", org_id=org.id
+    )
     db.add(it); db.commit(); db.refresh(it)
     return it
 
@@ -82,5 +97,3 @@ def test_extract_uses_raw_as_source(db_session, monkeypatch):
     assert "2.8мм" in captured["prompt"]  # сырьё попало в промпт
     db_session.refresh(it)
     assert it.characteristics == {"Разрешение": "2 Мп"}
-
-

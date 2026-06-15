@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_active, require_admin
+from app.auth.deps import current_org, require_active, require_admin
 from app.catalog import detect, importer, parser, service
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.catalog.schemas import (
@@ -53,8 +53,15 @@ def _load_tables_or_415(content: bytes, filename: str) -> dict:
 @router.get(
     "/price-levels", response_model=list[PriceLevelOut], dependencies=[Depends(require_active)]
 )
-def list_price_levels(db: Session = Depends(get_db)):
-    return db.scalars(select(PriceLevel).order_by(PriceLevel.sort_order, PriceLevel.id)).all()
+def list_price_levels(
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(
+        select(PriceLevel)
+        .where(PriceLevel.org_id == org)
+        .order_by(PriceLevel.sort_order, PriceLevel.id)
+    ).all()
 
 
 @router.post(
@@ -63,10 +70,16 @@ def list_price_levels(db: Session = Depends(get_db)):
     status_code=201,
     dependencies=[Depends(require_admin)],
 )
-def create_price_level(body: PriceLevelIn, db: Session = Depends(get_db)):
-    if db.scalar(select(PriceLevel).where(PriceLevel.name == body.name)):
+def create_price_level(
+    body: PriceLevelIn,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    if db.scalar(
+        select(PriceLevel).where(PriceLevel.org_id == org, PriceLevel.name == body.name)
+    ):
         raise HTTPException(status_code=409, detail="Уровень с таким именем уже есть")
-    level = PriceLevel(name=body.name, sort_order=body.sort_order)
+    level = PriceLevel(name=body.name, sort_order=body.sort_order, org_id=org)
     db.add(level)
     db.commit()
     db.refresh(level)
@@ -78,12 +91,21 @@ def create_price_level(body: PriceLevelIn, db: Session = Depends(get_db)):
     response_model=PriceLevelOut,
     dependencies=[Depends(require_admin)],
 )
-def update_price_level(level_id: int, body: PriceLevelPatch, db: Session = Depends(get_db)):
-    level = db.get(PriceLevel, level_id)
+def update_price_level(
+    level_id: int,
+    body: PriceLevelPatch,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    level = db.scalar(
+        select(PriceLevel).where(PriceLevel.id == level_id, PriceLevel.org_id == org)
+    )
     if level is None:
         raise HTTPException(status_code=404, detail="Уровень не найден")
     if body.name is not None and body.name != level.name:
-        if db.scalar(select(PriceLevel).where(PriceLevel.name == body.name)):
+        if db.scalar(
+            select(PriceLevel).where(PriceLevel.org_id == org, PriceLevel.name == body.name)
+        ):
             raise HTTPException(status_code=409, detail="Уровень с таким именем уже есть")
         level.name = body.name
     if body.sort_order is not None:
@@ -96,17 +118,28 @@ def update_price_level(level_id: int, body: PriceLevelPatch, db: Session = Depen
 @router.get(
     "/suppliers", response_model=list[SupplierOut], dependencies=[Depends(require_active)]
 )
-def list_suppliers(db: Session = Depends(get_db)):
-    return db.scalars(select(Supplier).order_by(Supplier.name)).all()
+def list_suppliers(
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(
+        select(Supplier).where(Supplier.org_id == org).order_by(Supplier.name)
+    ).all()
 
 
 @router.post(
     "/suppliers", response_model=SupplierOut, status_code=201, dependencies=[Depends(require_admin)]
 )
-def create_supplier(body: SupplierIn, db: Session = Depends(get_db)):
-    if db.scalar(select(Supplier).where(Supplier.name == body.name)):
+def create_supplier(
+    body: SupplierIn,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    if db.scalar(
+        select(Supplier).where(Supplier.org_id == org, Supplier.name == body.name)
+    ):
         raise HTTPException(status_code=409, detail="Поставщик уже существует")
-    supplier = Supplier(name=body.name)
+    supplier = Supplier(name=body.name, org_id=org)
     db.add(supplier)
     db.commit()
     db.refresh(supplier)
@@ -116,8 +149,14 @@ def create_supplier(body: SupplierIn, db: Session = Depends(get_db)):
 @router.delete(
     "/price-levels/{level_id}", status_code=204, dependencies=[Depends(require_admin)]
 )
-def delete_price_level(level_id: int, db: Session = Depends(get_db)):
-    level = db.get(PriceLevel, level_id)
+def delete_price_level(
+    level_id: int,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    level = db.scalar(
+        select(PriceLevel).where(PriceLevel.id == level_id, PriceLevel.org_id == org)
+    )
     if level is None:
         raise HTTPException(status_code=404, detail="Уровень не найден")
     if db.scalar(select(ItemPrice).where(ItemPrice.price_level_id == level_id).limit(1)):
@@ -173,9 +212,13 @@ async def import_file(
     sheet_mappings: str = Form(...),
     use_sheet_as_category: bool = Form(False),
     save_mapping: bool = Form(False),
+    org: int = Depends(current_org),
     db: Session = Depends(get_db),
 ):
-    supplier = db.get(Supplier, supplier_id)
+    # Verify supplier belongs to this org
+    supplier = db.scalar(
+        select(Supplier).where(Supplier.id == supplier_id, Supplier.org_id == org)
+    )
     if supplier is None:
         raise HTTPException(status_code=404, detail="Поставщик не найден")
     if kind not in ("material", "work"):
@@ -202,7 +245,7 @@ async def import_file(
 
     try:
         summary = importer.import_parsed(
-            db, supplier_id, file.filename or "import", parsed, kind=kind
+            db, supplier_id, file.filename or "import", parsed, kind=kind, org_id=org
         )
     except Exception:
         db.rollback()
@@ -223,6 +266,7 @@ def list_items(
     limit: int = 50,
     offset: int = 0,
     f: list[str] = Query(default=[]),
+    org: int = Depends(current_org),
     db: Session = Depends(get_db),
 ):
     facets = {}
@@ -231,7 +275,7 @@ def list_items(
             k, v = pair.split("=", 1)
             facets[k] = v
     items, total = service.search_items(
-        db, q, supplier_id, kind, min(limit, 200), offset, facets=facets
+        db, q, supplier_id, kind, min(limit, 200), offset, facets=facets, org_id=org
     )
     prices = service.latest_prices_for(db, [i.id for i in items])
     out = [
@@ -255,9 +299,15 @@ def list_items(
 
 @router.get("/catalog/facets", dependencies=[Depends(require_active)])
 def catalog_facets(
-    supplier_id: int | None = None, kind: str | None = None, db: Session = Depends(get_db),
+    supplier_id: int | None = None,
+    kind: str | None = None,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
 ):
-    query = select(CatalogItem.characteristics).where(CatalogItem.characteristics.isnot(None))
+    query = select(CatalogItem.characteristics).where(
+        CatalogItem.characteristics.isnot(None),
+        CatalogItem.org_id == org,
+    )
     if supplier_id is not None:
         query = query.where(CatalogItem.supplier_id == supplier_id)
     if kind is not None:
@@ -277,8 +327,15 @@ def catalog_facets(
     response_model=list[PriceHistoryOut],
     dependencies=[Depends(require_active)],
 )
-def item_price_history(item_id: int, db: Session = Depends(get_db)):
-    if db.get(CatalogItem, item_id) is None:
+def item_price_history(
+    item_id: int,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    item = db.scalar(
+        select(CatalogItem).where(CatalogItem.id == item_id, CatalogItem.org_id == org)
+    )
+    if item is None:
         raise HTTPException(status_code=404, detail="Позиция не найдена")
     rows = db.execute(
         select(ItemPrice, PriceList)
@@ -303,8 +360,12 @@ def item_price_history(item_id: int, db: Session = Depends(get_db)):
     response_model=list[PriceListOut],
     dependencies=[Depends(require_active)],
 )
-def list_price_lists(supplier_id: int | None = None, db: Session = Depends(get_db)):
-    query = select(PriceList).order_by(PriceList.imported_at.desc())
+def list_price_lists(
+    supplier_id: int | None = None,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
+    query = select(PriceList).where(PriceList.org_id == org).order_by(PriceList.imported_at.desc())
     if supplier_id is not None:
         query = query.where(PriceList.supplier_id == supplier_id)
     rows = db.scalars(query).all()
@@ -326,7 +387,10 @@ def list_price_lists(supplier_id: int | None = None, db: Session = Depends(get_d
     dependencies=[Depends(require_admin)],
 )
 def start_extract_characteristics(
-    supplier_id: int | None = None, force: bool = False, db: Session = Depends(get_db),
+    supplier_id: int | None = None,
+    force: bool = False,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
 ):
     """Запускает извлечение характеристик фоновой задачей. Если активная задача уже
     есть — возвращает её (без дублирования расхода). force=true — сбросить уже
@@ -337,12 +401,12 @@ def start_extract_characteristics(
     if active is not None:
         return active
     if force:
-        q = update(CatalogItem).values(characteristics=None)
+        q = update(CatalogItem).values(characteristics=None).where(CatalogItem.org_id == org)
         if supplier_id is not None:
             q = q.where(CatalogItem.supplier_id == supplier_id)
         db.execute(q)
         db.commit()
-    job = Job(type="catalog_extract", params={"supplier_id": supplier_id})
+    job = Job(type="catalog_extract", params={"supplier_id": supplier_id, "org_id": org})
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -350,12 +414,17 @@ def start_extract_characteristics(
 
 
 @router.delete("/catalog/items", dependencies=[Depends(require_admin)])
-def clear_catalog(supplier_id: int | None = None, db: Session = Depends(get_db)):
+def clear_catalog(
+    supplier_id: int | None = None,
+    org: int = Depends(current_org),
+    db: Session = Depends(get_db),
+):
     """Очистка каталога (опц. по поставщику): удаляет позиции и их цены, отвязывает
-    строки смет (item_id→NULL, снапшоты сумм в сметах сохраняются)."""
+    строки смет (item_id→NULL, снапшоты сумм в сметах сохраняются).
+    Scope: только позиции текущей org."""
     from app.estimates.models import EstimateLine
 
-    q = select(CatalogItem.id)
+    q = select(CatalogItem.id).where(CatalogItem.org_id == org)
     if supplier_id is not None:
         q = q.where(CatalogItem.supplier_id == supplier_id)
     ids = list(db.scalars(q).all())

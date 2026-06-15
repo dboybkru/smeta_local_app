@@ -22,20 +22,24 @@ KINDS = ("material", "work")
 
 class PriceLevel(Base):
     __tablename__ = "price_levels"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_price_levels_org_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
     sort_order: Mapped[int] = mapped_column(default=0)
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
 
 
 class Supplier(Base):
     __tablename__ = "suppliers"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_suppliers_org_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
     column_mapping_template: Mapped[dict | None] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql")
     )
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
 
 
 class PriceList(Base):
@@ -52,6 +56,7 @@ class PriceList(Base):
     imported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
 
 
 class CatalogItem(Base):
@@ -77,6 +82,7 @@ class CatalogItem(Base):
     characteristics_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     manufacturer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     price_on_request: Mapped[bool] = mapped_column(Boolean, default=False)
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
 
 
 class ItemPrice(Base):

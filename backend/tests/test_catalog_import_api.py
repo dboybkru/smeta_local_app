@@ -4,8 +4,8 @@ from tests.catalog_files import make_bolid_xlsx, make_optimus_xlsx
 from tests.test_price_levels import make_admin
 
 
-def test_import_returns_problems(client):
-    admin = make_admin(client)
+def test_import_returns_problems(client, db_session):
+    admin = make_admin(client, db_session)
     retail = create_level(client, admin, "Розница")
     supplier_id = create_supplier(client, admin, "P")
     csv_content = "Название;Цена\nТовар;нечисло\nНорм;100\n".encode()
@@ -37,8 +37,8 @@ def create_supplier(client, admin, name="Bolid"):
     return client.post("/api/suppliers", json={"name": name}, headers=admin).json()["id"]
 
 
-def test_inspect_returns_sheets_and_columns(client):
-    admin = make_admin(client)
+def test_inspect_returns_sheets_and_columns(client, db_session):
+    admin = make_admin(client, db_session)
     resp = client.post(
         "/api/catalog/inspect",
         files={"file": ("optimus.xlsx", make_optimus_xlsx())},
@@ -53,8 +53,8 @@ def test_inspect_returns_sheets_and_columns(client):
     assert cam["columns"][2]["samples"] == ["3210.5", "5283"]
 
 
-def test_import_bolid_end_to_end(client):
-    admin = make_admin(client)
+def test_import_bolid_end_to_end(client, db_session):
+    admin = make_admin(client, db_session)
     retail = create_level(client, admin, "Розница")
     opt = create_level(client, admin, "Опт")
     supplier_id = create_supplier(client, admin)
@@ -81,8 +81,8 @@ def test_import_bolid_end_to_end(client):
     assert suppliers[0]["column_mapping_template"]["name_col"] == 0
 
 
-def test_import_optimus_sheet_as_category(client):
-    admin = make_admin(client)
+def test_import_optimus_sheet_as_category(client, db_session):
+    admin = make_admin(client, db_session)
     partner = create_level(client, admin, "Партнёр")
     supplier_id = create_supplier(client, admin, "Optimus")
     mapping = {"name_col": 1, "article_col": 0, "header_row": 2, "price_cols": {partner: 2}}
@@ -106,8 +106,8 @@ def test_import_optimus_sheet_as_category(client):
     assert resp.json()["items_created"] == 3
 
 
-def test_import_unknown_supplier_404(client):
-    admin = make_admin(client)
+def test_import_unknown_supplier_404(client, db_session):
+    admin = make_admin(client, db_session)
     resp = client.post(
         "/api/catalog/import",
         files={"file": ("b.xlsx", make_bolid_xlsx())},
@@ -125,16 +125,16 @@ def test_import_unknown_supplier_404(client):
     assert resp.status_code == 404
 
 
-def test_inspect_bad_extension_415(client):
-    admin = make_admin(client)
+def test_inspect_bad_extension_415(client, db_session):
+    admin = make_admin(client, db_session)
     resp = client.post(
         "/api/catalog/inspect", files={"file": ("doc.pdf", b"%PDF")}, headers=admin
     )
     assert resp.status_code == 415
 
 
-def test_oversized_upload_413(client):
-    admin = make_admin(client)
+def test_oversized_upload_413(client, db_session):
+    admin = make_admin(client, db_session)
     big = b"x" * (25 * 1024 * 1024 + 1)
     resp = client.post(
         "/api/catalog/inspect", files={"file": ("big.xlsx", big)}, headers=admin
@@ -142,8 +142,8 @@ def test_oversized_upload_413(client):
     assert resp.status_code == 413
 
 
-def test_corrupt_xlsx_422(client):
-    admin = make_admin(client)
+def test_corrupt_xlsx_422(client, db_session):
+    admin = make_admin(client, db_session)
     resp = client.post(
         "/api/catalog/inspect",
         files={"file": ("fake.xlsx", b"this is not a zip")},
@@ -152,8 +152,8 @@ def test_corrupt_xlsx_422(client):
     assert resp.status_code == 422
 
 
-def test_inspect_returns_detected(client):
-    admin = make_admin(client)
+def test_inspect_returns_detected(client, db_session):
+    admin = make_admin(client, db_session)
     resp = client.post(
         "/api/catalog/inspect",
         files={"file": ("bolid.xlsx", make_bolid_xlsx())},
@@ -165,8 +165,8 @@ def test_inspect_returns_detected(client):
     assert sheet["detected"]["name_col"] == 0
 
 
-def test_import_per_sheet_mapping(client):
-    admin = make_admin(client)
+def test_import_per_sheet_mapping(client, db_session):
+    admin = make_admin(client, db_session)
     retail = create_level(client, admin, "Розница")
     supplier_id = create_supplier(client, admin, "PS")
     mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {retail: 3}}

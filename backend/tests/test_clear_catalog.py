@@ -26,12 +26,15 @@ def _hdr(u):
     return {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
 
 
-def _supplier_with_item(db, name="S"):
-    sup = Supplier(name=name); db.add(sup); db.commit()
-    it = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material")
+def _supplier_with_item(db, name="S", org_id=None):
+    sup = Supplier(name=name, org_id=org_id); db.add(sup); db.commit()
+    it = CatalogItem(
+        supplier_id=sup.id, name="Камера", article="A", unit="шт", kind="material",
+        org_id=org_id,
+    )
     db.add(it); db.commit()
-    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1)
-    lvl = PriceLevel(name=f"Розница-{name}", sort_order=0)
+    pl = PriceList(supplier_id=sup.id, filename="p.xlsx", version=1, org_id=org_id)
+    lvl = PriceLevel(name=f"Розница-{name}", sort_order=0, org_id=org_id)
     db.add_all([pl, lvl]); db.commit()
     db.add(ItemPrice(item_id=it.id, price_list_id=pl.id, price_level_id=lvl.id, value=100))
     db.commit()
@@ -40,8 +43,8 @@ def _supplier_with_item(db, name="S"):
 
 def test_clear_catalog_deletes_items_and_unlinks_estimate_lines(client, db_session):
     a = _admin(db_session)
-    sup, it = _supplier_with_item(db_session)
     org = _get_org(db_session)
+    sup, it = _supplier_with_item(db_session, org_id=org.id)
     est = Estimate(owner_id=a.id, org_id=org.id, object_name="O"); db_session.add(est); db_session.commit()
     br = EstimateBranch(estimate_id=est.id, name="Базовая"); db_session.add(br); db_session.commit()
     sec = EstimateSection(branch_id=br.id, name="С"); db_session.add(sec); db_session.commit()
@@ -60,8 +63,9 @@ def test_clear_catalog_deletes_items_and_unlinks_estimate_lines(client, db_sessi
 
 def test_clear_catalog_per_supplier(client, db_session):
     a = _admin(db_session)
-    sup1, _ = _supplier_with_item(db_session, "S1")
-    sup2, _ = _supplier_with_item(db_session, "S2")
+    org = _get_org(db_session)
+    sup1, _ = _supplier_with_item(db_session, "S1", org_id=org.id)
+    sup2, _ = _supplier_with_item(db_session, "S2", org_id=org.id)
     r = client.request("DELETE", f"/api/catalog/items?supplier_id={sup1.id}", headers=_hdr(a))
     assert r.json() == {"deleted": 1}
     remaining = db_session.scalars(__import__("sqlalchemy").select(CatalogItem)).all()
@@ -77,7 +81,8 @@ def test_clear_catalog_admin_only(client, db_session):
 
 def test_force_reextract_resets_characteristics(client, db_session):
     a = _admin(db_session)
-    sup, it = _supplier_with_item(db_session)
+    org = _get_org(db_session)
+    sup, it = _supplier_with_item(db_session, org_id=org.id)
     it.characteristics = {"Разрешение": "2 Мп"}; db_session.commit()
     r = client.post("/api/catalog/extract-characteristics/start?force=true", headers=_hdr(a))
     assert r.status_code == 200

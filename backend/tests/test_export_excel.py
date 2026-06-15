@@ -67,9 +67,9 @@ def test_export_includes_catalog_characteristics(db_session):
     org = _get_org(db_session)
     u = User(email="c@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
-    sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
+    sup = Supplier(name="P", org_id=org.id); db_session.add(sup); db_session.commit()
     item = CatalogItem(supplier_id=sup.id, name="Камера", article="A", unit="шт",
-                       kind="material", characteristics={"Разрешение": "2 Мп"})
+                       kind="material", characteristics={"Разрешение": "2 Мп"}, org_id=org.id)
     db_session.add(item); db_session.commit()
     est = Estimate(owner_id=u.id, org_id=org.id, object_name="Объект")
     branch = EstimateBranch(name="Базовая")

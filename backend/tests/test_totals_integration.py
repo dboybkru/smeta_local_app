@@ -30,12 +30,15 @@ def _hdr(u):
 
 
 def _item(db, name, kind, roz, zak):
-    sup = Supplier(name=f"S-{name}")
+    org = _get_org(db)
+    sup = Supplier(name=f"S-{name}", org_id=org.id)
     db.add(sup)
     db.commit()
-    it = CatalogItem(supplier_id=sup.id, name=name, article=name, unit="шт", kind=kind)
+    it = CatalogItem(
+        supplier_id=sup.id, name=name, article=name, unit="шт", kind=kind, org_id=org.id
+    )
     db.add(it)
-    pl = PriceList(supplier_id=sup.id, filename="p", version=1)
+    pl = PriceList(supplier_id=sup.id, filename="p", version=1, org_id=org.id)
     db.add(pl)
     db.commit()
     levels = {lvl.name: lvl for lvl in db.query(PriceLevel).all()}
@@ -60,7 +63,11 @@ def _item(db, name, kind, roz, zak):
 
 
 def _setup_levels(db):
-    db.add_all([PriceLevel(name="Розница", sort_order=0), PriceLevel(name="Закупка", sort_order=1)])
+    org = _get_org(db)
+    db.add_all([
+        PriceLevel(name="Розница", sort_order=0, org_id=org.id),
+        PriceLevel(name="Закупка", sort_order=1, org_id=org.id),
+    ])
     db.commit()
 
 

@@ -1,19 +1,31 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
+from app.orgs.models import Organization
+
+
+def _get_or_create_org(db):
+    org = db.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db.add(org)
+        db.commit()
+    return org
 
 
 def test_catalog_models_roundtrip(db_session):
-    level = PriceLevel(name="Закупка", sort_order=1)
-    supplier = Supplier(name="Bolid")
+    org = _get_or_create_org(db_session)
+    level = PriceLevel(name="Закупка", sort_order=1, org_id=org.id)
+    supplier = Supplier(name="Bolid", org_id=org.id)
     db_session.add_all([level, supplier])
     db_session.commit()
 
-    price_list = PriceList(supplier_id=supplier.id, filename="bolid.xlsx", version=1)
-    item = CatalogItem(supplier_id=supplier.id, name="С2000-М", article="004432")
+    price_list = PriceList(supplier_id=supplier.id, filename="bolid.xlsx", version=1, org_id=org.id)
+    item = CatalogItem(supplier_id=supplier.id, name="С2000-М", article="004432", org_id=org.id)
     db_session.add_all([price_list, item])
     db_session.commit()
 
@@ -35,27 +47,32 @@ def test_catalog_models_roundtrip(db_session):
 
 
 def test_invalid_kind_rejected(db_session):
-    supplier = Supplier(name="S")
+    org = _get_or_create_org(db_session)
+    supplier = Supplier(name="S", org_id=org.id)
     db_session.add(supplier)
     db_session.commit()
-    db_session.add(CatalogItem(supplier_id=supplier.id, name="X", kind="service"))
+    db_session.add(CatalogItem(supplier_id=supplier.id, name="X", kind="service", org_id=org.id))
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
 
 
 def test_catalog_item_new_fields_defaults(db_session):
-    sup = Supplier(name="S"); db_session.add(sup); db_session.commit()
-    it = CatalogItem(supplier_id=sup.id, name="Камера")
+    org = _get_or_create_org(db_session)
+    sup = Supplier(name="S", org_id=org.id); db_session.add(sup); db_session.commit()
+    it = CatalogItem(supplier_id=sup.id, name="Камера", org_id=org.id)
     db_session.add(it); db_session.commit(); db_session.refresh(it)
     assert it.manufacturer is None
     assert it.price_on_request is False
 
 
 def test_catalog_item_set_new_fields(db_session):
-    sup = Supplier(name="S2"); db_session.add(sup); db_session.commit()
-    it = CatalogItem(supplier_id=sup.id, name="Камера", manufacturer="Optimus",
-                     price_on_request=True)
+    org = _get_or_create_org(db_session)
+    sup = Supplier(name="S2", org_id=org.id); db_session.add(sup); db_session.commit()
+    it = CatalogItem(
+        supplier_id=sup.id, name="Камера", manufacturer="Optimus",
+        price_on_request=True, org_id=org.id,
+    )
     db_session.add(it); db_session.commit(); db_session.refresh(it)
     assert it.manufacturer == "Optimus"
     assert it.price_on_request is True

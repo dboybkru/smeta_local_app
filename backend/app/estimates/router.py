@@ -63,7 +63,14 @@ def update_client(
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
     client = service.get_client_for_org(db, client_id, org_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    # Validate price level belongs to same org
+    if "default_price_level_id" in updates and updates["default_price_level_id"] is not None:
+        from app.catalog.models import PriceLevel
+        level = db.get(PriceLevel, updates["default_price_level_id"])
+        if level is None or level.org_id != org_id:
+            raise HTTPException(status_code=404, detail="Уровень цен не найден")
+    for field, value in updates.items():
         setattr(client, field, value)
     db.commit()
     db.refresh(client)
@@ -210,7 +217,9 @@ def add_line(
             raise HTTPException(status_code=404, detail="Позиция каталога не найдена")
         est = section.branch.estimate
         client = db.get(models.Client, est.client_id) if est.client_id else None
-        work, material, purchase = service.snapshot_line_values(db, item, client)
+        work, material, purchase = service.snapshot_line_values(
+            db, item, client, org_id=user.org_id
+        )
         line = models.EstimateLine(
             section_id=section.id,
             item_id=item.id,

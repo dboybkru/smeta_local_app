@@ -17,14 +17,16 @@ _MAX_BATCHES = 1000
 
 
 def _run_catalog_extract(db, job: Job) -> None:
-    supplier_id = (job.params or {}).get("supplier_id")
-    total = ch._remaining(db, supplier_id)
+    params = job.params or {}
+    supplier_id = params.get("supplier_id")
+    org_id = params.get("org_id")  # may be None for legacy jobs — process all orgs safely
+    total = ch._remaining(db, supplier_id, org_id=org_id)
     job.total = total
     job.processed = 0
     job.message = f"обработано 0/{total}"
     db.commit()
     for _ in range(_MAX_BATCHES):
-        r = ch.extract_batch(db, batch=15, supplier_id=supplier_id)
+        r = ch.extract_batch(db, batch=15, supplier_id=supplier_id, org_id=org_id)
         if r["processed"] == 0:
             break
         job.processed = total - r["remaining"] if total else job.processed + r["processed"]
