@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     yandex_client_secret: str = ""
     frontend_url: str = "http://localhost:5173"
     backend_url: str = "http://localhost:8000"
-    anthropic_api_key: str = ""
 
 
 settings = Settings()

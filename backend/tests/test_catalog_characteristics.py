@@ -84,32 +84,3 @@ def test_extract_uses_raw_as_source(db_session, monkeypatch):
     assert it.characteristics == {"Разрешение": "2 Мп"}
 
 
-from app.ai.errors import AINotConfigured  # noqa: E402
-from app.auth.models import User as _User  # noqa: E402
-
-
-def test_extract_endpoint_processes_and_reports(client, db_session, monkeypatch):
-    a = _admin(db_session)
-    it = _item(db_session, name="Камера 2Мп")
-    monkeypatch.setattr(ai_service, "call_llm", lambda *args, **k: {
-        "items": [{"id": it.id, "characteristics": {"Разрешение": "2 Мп"}}]})
-    r = client.post("/api/catalog/extract-characteristics", headers=_hdr(a))
-    assert r.status_code == 200, r.text
-    assert r.json() == {"processed": 1, "remaining": 0}
-
-
-def test_extract_endpoint_admin_only(client, db_session):
-    e = _User(email="e@x.ru", name="E", role="estimator", status="active")
-    db_session.add(e); db_session.commit()
-    r = client.post("/api/catalog/extract-characteristics", headers=_hdr(e))
-    assert r.status_code == 403
-
-
-def test_extract_endpoint_503_when_not_configured(client, db_session, monkeypatch):
-    a = _admin(db_session)
-    _item(db_session, name="X")
-    def boom(*args, **k):
-        raise AINotConfigured("catalog_extract не настроена")
-    monkeypatch.setattr(ai_service, "call_llm", boom)
-    r = client.post("/api/catalog/extract-characteristics", headers=_hdr(a))
-    assert r.status_code == 503

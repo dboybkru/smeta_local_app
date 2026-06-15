@@ -149,15 +149,6 @@ export const getFacets = (supplierId?: number, kind?: string) => {
   return api<Record<string, string[]>>(`/catalog/facets${qs ? `?${qs}` : ""}`);
 };
 
-export const extractCharacteristics = (supplierId?: number, batch = 40) => {
-  const params = new URLSearchParams({ batch: String(batch) });
-  if (supplierId != null) params.set("supplier_id", String(supplierId));
-  return api<{ processed: number; remaining: number }>(
-    `/catalog/extract-characteristics?${params.toString()}`,
-    { method: "POST" },
-  );
-};
-
 export const listPriceLists = (supplier_id?: number) => {
   const params = new URLSearchParams();
   if (supplier_id != null) params.set("supplier_id", String(supplier_id));
