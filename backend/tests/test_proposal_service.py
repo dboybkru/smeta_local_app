@@ -1,18 +1,31 @@
 import pytest
 
+from sqlalchemy import select
+
 from app.ai import service as ai_service
 from app.ai.errors import AINotConfigured
 from app.auth.models import User
 from app.estimates.models import Estimate, EstimateBranch, EstimateLine, EstimateSection
+from app.orgs.models import Organization
 from app.profile.models import CompanyProfile
 from app.proposals import service
 
 
+def _get_org(db_session):
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    return org
+
+
 def _estimate_with_lines(db_session):
-    u = User(email="u@x.ru", name="U", role="estimator", status="active")
+    org = _get_org(db_session)
+    u = User(email="u@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
-    est = Estimate(owner_id=u.id, object_name="Квартира 80 м²")
+    est = Estimate(owner_id=u.id, org_id=org.id, object_name="Квартира 80 м²")
     branch = EstimateBranch(name="Базовая")
     section = EstimateSection(name="Демонтаж")
     section.lines.append(

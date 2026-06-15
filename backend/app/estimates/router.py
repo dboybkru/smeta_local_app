@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_active
+from app.auth.deps import current_org, require_active
 from app.auth.models import User
 from app.catalog.models import CatalogItem
 from app.clients import dadata
@@ -16,10 +15,12 @@ router = APIRouter(prefix="/api", tags=["estimates"])
 @router.get(
     "/clients",
     response_model=list[schemas.ClientOut],
-    dependencies=[Depends(require_active)],
 )
-def list_clients(db: Session = Depends(get_db)):
-    return db.scalars(select(models.Client).order_by(models.Client.name)).all()
+def list_clients(
+    db: Session = Depends(get_db),
+    org_id: int = Depends(current_org),
+):
+    return service.list_clients(db, org_id)
 
 
 @router.post("/clients", response_model=schemas.ClientOut, status_code=201)
@@ -27,14 +28,11 @@ def create_client(
     body: schemas.ClientIn,
     db: Session = Depends(get_db),
     user: User = Depends(require_active),
+    org_id: int = Depends(current_org),
 ):
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
-    client = models.Client(**body.model_dump())
-    db.add(client)
-    db.commit()
-    db.refresh(client)
-    return client
+    return service.create_client(db, body, org_id)
 
 
 @router.get("/clients/suggest", dependencies=[Depends(require_active)])
@@ -46,25 +44,25 @@ def suggest_clients(q: str = "", db: Session = Depends(get_db)):
     return dadata.suggest_parties(token, q, secret=secret)
 
 
-@router.get("/clients/{client_id}", response_model=schemas.ClientOut,
-            dependencies=[Depends(require_active)])
-def get_client(client_id: int, db: Session = Depends(get_db)):
-    client = db.get(models.Client, client_id)
-    if client is None:
-        raise HTTPException(status_code=404, detail="Клиент не найден")
-    return client
+@router.get("/clients/{client_id}", response_model=schemas.ClientOut)
+def get_client(
+    client_id: int,
+    db: Session = Depends(get_db),
+    org_id: int = Depends(current_org),
+):
+    return service.get_client_for_org(db, client_id, org_id)
 
 
 @router.patch("/clients/{client_id}", response_model=schemas.ClientOut)
 def update_client(
     client_id: int, body: schemas.ClientPatch,
-    db: Session = Depends(get_db), user: User = Depends(require_active),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_active),
+    org_id: int = Depends(current_org),
 ):
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
-    client = db.get(models.Client, client_id)
-    if client is None:
-        raise HTTPException(status_code=404, detail="Клиент не найден")
+    client = service.get_client_for_org(db, client_id, org_id)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(client, field, value)
     db.commit()
@@ -82,11 +80,13 @@ def create_estimate(
     body: schemas.EstimateIn,
     db: Session = Depends(get_db),
     user: User = Depends(require_active),
+    org_id: int = Depends(current_org),
 ):
     if user.role == "viewer":
         raise HTTPException(status_code=403, detail="Просмотр без права изменения")
     est = models.Estimate(
         owner_id=user.id,
+        org_id=org_id,
         object_name=body.object_name,
         client_id=body.client_id,
         vat_enabled=body.vat_enabled,

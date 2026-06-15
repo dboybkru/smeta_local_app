@@ -13,6 +13,7 @@ class Client(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     default_price_level_id: Mapped[int | None] = mapped_column(
         ForeignKey("price_levels.id"), nullable=True
     )
@@ -39,6 +40,7 @@ class Estimate(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     object_name: Mapped[str] = mapped_column(String(500), default="")
     status: Mapped[str] = mapped_column(String(20), default="draft")
     vat_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

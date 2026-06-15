@@ -24,15 +24,24 @@ from app.ai import service as ai_service  # noqa: E402
 
 
 def _estimate_with_catalog(db_session):
+    from sqlalchemy import select
+
     from app.auth.models import User
     from app.catalog.models import CatalogItem, Supplier
     from app.estimates import models as em
-    u = User(email="a@x.ru", name="U", role="estimator", status="active")
+    from app.orgs.models import Organization
+
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    u = User(email="a@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u); db_session.commit()
     sup = Supplier(name="P"); db_session.add(sup); db_session.commit()
     item = CatalogItem(supplier_id=sup.id, name="Камера IP", article="A", unit="шт", kind="material")
     db_session.add(item); db_session.commit()
-    est = em.Estimate(owner_id=u.id, object_name="Склад")
+    est = em.Estimate(owner_id=u.id, org_id=org.id, object_name="Склад")
     db_session.add(est); db_session.commit()
     br = em.EstimateBranch(estimate_id=est.id, name="Базовая")
     db_session.add(br); db_session.commit()

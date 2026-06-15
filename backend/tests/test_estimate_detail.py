@@ -1,12 +1,25 @@
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.core.security import create_access_token
+from app.orgs.models import Organization
+
+
+def _get_org(db_session):
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    return org
 
 
 def _user(db_session, role="estimator", email=None):
-    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active")
+    org = _get_org(db_session)
+    u = User(email=email or f"{role}@x.ru", name="U", role=role, status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
     return u
@@ -98,30 +111,24 @@ def test_viewer_does_not_see_margin(client, db_session):
 
 
 def test_detail_includes_proposal(client, db_session):
-    from app.auth.models import User
-    from app.core.security import create_access_token
     from app.estimates.models import Estimate
 
-    u = User(email="p@x.ru", name="U", role="estimator", status="active")
-    db_session.add(u); db_session.commit()
-    est = Estimate(owner_id=u.id, object_name="Объект",
+    u = _user(db_session, email="p@x.ru")
+    org = _get_org(db_session)
+    est = Estimate(owner_id=u.id, org_id=org.id, object_name="Объект",
                    proposal={"title": "КП", "advantages": ["a"]})
     db_session.add(est); db_session.commit(); db_session.refresh(est)
-    hdr = {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
-    r = client.get(f"/api/estimates/{est.id}", headers=hdr)
+    r = client.get(f"/api/estimates/{est.id}", headers=_hdr(u))
     assert r.status_code == 200, r.text
     assert r.json()["proposal"] == {"title": "КП", "advantages": ["a"]}
 
 
 def test_detail_proposal_null_by_default(client, db_session):
-    from app.auth.models import User
-    from app.core.security import create_access_token
     from app.estimates.models import Estimate
 
-    u = User(email="p2@x.ru", name="U", role="estimator", status="active")
-    db_session.add(u); db_session.commit()
-    est = Estimate(owner_id=u.id, object_name="Объект")
+    u = _user(db_session, email="p2@x.ru")
+    org = _get_org(db_session)
+    est = Estimate(owner_id=u.id, org_id=org.id, object_name="Объект")
     db_session.add(est); db_session.commit(); db_session.refresh(est)
-    hdr = {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
-    r = client.get(f"/api/estimates/{est.id}", headers=hdr)
+    r = client.get(f"/api/estimates/{est.id}", headers=_hdr(u))
     assert r.json()["proposal"] is None

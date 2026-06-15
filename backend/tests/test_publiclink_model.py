@@ -1,13 +1,21 @@
+from sqlalchemy import select
+
 from app.auth.models import User
 from app.estimates.models import Estimate
+from app.orgs.models import Organization
 from app.publiclinks.models import PublicLink
 
 
 def test_public_link_defaults(db_session):
-    u = User(email="u@x.ru", name="U", role="estimator", status="active")
+    org = db_session.scalars(select(Organization).limit(1)).first()
+    if org is None:
+        org = Organization(name="TestOrg")
+        db_session.add(org)
+        db_session.commit()
+    u = User(email="u@x.ru", name="U", role="estimator", status="active", org_id=org.id)
     db_session.add(u)
     db_session.commit()
-    est = Estimate(owner_id=u.id, object_name="Объект")
+    est = Estimate(owner_id=u.id, org_id=org.id, object_name="Объект")
     db_session.add(est)
     db_session.commit()
     link = PublicLink(estimate_id=est.id, token="abc123")
