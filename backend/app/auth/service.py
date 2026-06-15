@@ -54,7 +54,7 @@ def register_user(db: Session, email: str, password: str, name: str) -> User:
 
 
 def authenticate(db: Session, email: str, password: str) -> User:
-    email = email.lower()
+    email = email.strip().lower()
     user = db.scalar(select(User).where(User.email == email))
     # Хеш проверяется всегда, чтобы по времени ответа нельзя было перебрать email.
     # Пользователь без password_hash (Яндекс-аккаунт) никогда не проходит,
