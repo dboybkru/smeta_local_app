@@ -246,7 +246,13 @@ def apply_changeset(db: Session, estimate: em.Estimate, operations: list) -> Non
                 sec = by_name.get(op.section_name)
                 if sec is None:
                     raise ApplyError(f"Раздел «{op.section_name}» не найден")
-                item = db.get(CatalogItem, op.catalog_item_id)
+                from sqlalchemy import select as _select
+                item = db.scalar(
+                    _select(CatalogItem).where(
+                        CatalogItem.id == op.catalog_item_id,
+                        CatalogItem.org_id == org_id,
+                    )
+                )
                 if item is None:
                     raise ApplyError(f"Позиция каталога #{op.catalog_item_id} не найдена")
                 work, material, purchase = est_service.snapshot_line_values(

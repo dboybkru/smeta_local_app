@@ -24,28 +24,29 @@ def upgrade() -> None:
         op.create_foreign_key(f"fk_{t}_org", t, "organizations", ["org_id"], ["id"])
         op.create_index(f"ix_{t}_org_id", t, ["org_id"])
 
-    # Drop old global unique constraints (PostgreSQL names from original migration)
-    # Original migration created them via sa.UniqueConstraint('name') which Alembic names as:
-    #   price_levels → uq_price_levels_name
-    #   suppliers    → uq_suppliers_name
-    op.drop_constraint("uq_price_levels_name", "price_levels", type_="unique")
+    # Drop old global unique constraints (PostgreSQL auto-named from original migration).
+    # Original migration used sa.UniqueConstraint('name') without an explicit name=,
+    # so PostgreSQL generated: <table>_<col>_key  (standard auto-naming pattern).
+    #   price_levels → price_levels_name_key
+    #   suppliers    → suppliers_name_key
+    op.drop_constraint("price_levels_name_key", "price_levels", type_="unique")
     op.create_unique_constraint(
         "uq_price_levels_org_name", "price_levels", ["org_id", "name"]
     )
 
-    op.drop_constraint("uq_suppliers_name", "suppliers", type_="unique")
+    op.drop_constraint("suppliers_name_key", "suppliers", type_="unique")
     op.create_unique_constraint(
         "uq_suppliers_org_name", "suppliers", ["org_id", "name"]
     )
 
 
 def downgrade() -> None:
-    # Restore global unique constraints
+    # Restore global unique constraints (use original PostgreSQL auto-generated names)
     op.drop_constraint("uq_suppliers_org_name", "suppliers", type_="unique")
-    op.create_unique_constraint("uq_suppliers_name", "suppliers", ["name"])
+    op.create_unique_constraint("suppliers_name_key", "suppliers", ["name"])
 
     op.drop_constraint("uq_price_levels_org_name", "price_levels", type_="unique")
-    op.create_unique_constraint("uq_price_levels_name", "price_levels", ["name"])
+    op.create_unique_constraint("price_levels_name_key", "price_levels", ["name"])
 
     # Remove org_id columns
     for t in ("catalog_items", "price_lists", "price_levels", "suppliers"):

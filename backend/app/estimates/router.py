@@ -212,7 +212,13 @@ def add_line(
     section = service.get_owned_section(db, section_id, user)
     service.require_write(section.branch.estimate, user)
     if body.item_id is not None:
-        item = db.get(CatalogItem, body.item_id)
+        from sqlalchemy import select as _select
+        item = db.scalar(
+            _select(CatalogItem).where(
+                CatalogItem.id == body.item_id,
+                CatalogItem.org_id == section.branch.estimate.org_id,
+            )
+        )
         if item is None:
             raise HTTPException(status_code=404, detail="Позиция каталога не найдена")
         est = section.branch.estimate
