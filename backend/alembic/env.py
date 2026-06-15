@@ -8,10 +8,17 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+from app.ai import models as _ai_models  # noqa: F401
+from app.assistant import models as _assistant_models  # noqa: F401
 from app.auth import models  # noqa: F401  — registers tables in metadata
 from app.catalog import models as catalog_models  # noqa: F401
 from app.core.config import settings  # noqa: E402
 from app.core.db import Base  # noqa: E402
+from app.estimates import models as _estimate_models  # noqa: F401
+from app.jobs import models as _jobs_models  # noqa: F401
+from app.profile import models as _profile_models  # noqa: F401
+from app.publiclinks import models as _publiclink_models  # noqa: F401
+from app.settings import models as _settings_models  # noqa: F401
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
 

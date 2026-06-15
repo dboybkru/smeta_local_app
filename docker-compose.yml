@@ -31,8 +31,8 @@ services:
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     ports:
-      - "80:80"
-      - "443:443"
+      - "${WEB_HTTP_BIND:-80}:80"
+      - "${WEB_HTTPS_BIND:-443}:443"
     depends_on:
       - backend
 
