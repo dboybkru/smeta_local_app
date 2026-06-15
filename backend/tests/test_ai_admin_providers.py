@@ -180,6 +180,64 @@ def test_usage_summary_and_clear(client_app, db_session, monkeypatch):
     assert client_app.get("/api/ai/usage", headers=_hdr(a)).json()["total_calls"] == 0
 
 
+# --- SSRF-валидатор base_url ---
+
+def test_create_provider_rejects_metadata_url(client_app, db_session):
+    """http://169.254.169.254/... должен вернуть 422."""
+    a = _admin(db_session)
+    r = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "evil", "base_url": "http://169.254.169.254/latest/meta-data/",
+        "auth_style": "bearer", "api_key": "k"})
+    assert r.status_code == 422
+
+
+def test_create_provider_rejects_localhost(client_app, db_session):
+    """http://localhost/... должен вернуть 422."""
+    a = _admin(db_session)
+    r = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "evil", "base_url": "http://localhost/v1",
+        "auth_style": "bearer", "api_key": "k"})
+    assert r.status_code == 422
+
+
+def test_create_provider_rejects_ftp_scheme(client_app, db_session):
+    """ftp://... должен вернуть 422."""
+    a = _admin(db_session)
+    r = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "evil", "base_url": "ftp://evil.example.com/v1",
+        "auth_style": "bearer", "api_key": "k"})
+    assert r.status_code == 422
+
+
+def test_create_provider_rejects_file_scheme(client_app, db_session):
+    """file:///etc/passwd должен вернуть 422."""
+    a = _admin(db_session)
+    r = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "evil", "base_url": "file:///etc/passwd",
+        "auth_style": "bearer", "api_key": "k"})
+    assert r.status_code == 422
+
+
+def test_create_provider_accepts_valid_https(client_app, db_session):
+    """Корректный https-URL проходит валидацию."""
+    a = _admin(db_session)
+    r = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "openai", "base_url": "https://api.openai.com/v1",
+        "auth_style": "bearer", "api_key": "sk-ok"})
+    assert r.status_code == 201
+
+
+def test_update_provider_rejects_ssrf_base_url(client_app, db_session):
+    """PUT /providers/{id} с http://127.0.0.1 → 422."""
+    a = _admin(db_session)
+    pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={
+        "name": "p", "base_url": "https://api.example.com/v1",
+        "auth_style": "bearer", "api_key": "k"}).json()["id"]
+    r = client_app.put(f"/api/ai/providers/{pid}", headers=_hdr(a),
+                       json={"base_url": "http://127.0.0.1/steal"})
+    assert r.status_code == 422
+
+
 def test_update_model_price(client_app, db_session, monkeypatch):
     a = _admin(db_session)
     pid = client_app.post("/api/ai/providers", headers=_hdr(a), json={

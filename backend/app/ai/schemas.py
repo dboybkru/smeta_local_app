@@ -1,7 +1,33 @@
 from decimal import Decimal
 from typing import Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Хосты, которые нельзя использовать в base_url (SSRF-защита)
+_BLOCKED_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254"}
+
+
+def _validate_base_url(v: str) -> str:
+    """Валидатор base_url: требует http/https, запрещает внутренние адреса."""
+    v = v.strip()
+    parsed = urlparse(v)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            "base_url должен начинаться с http:// или https:// "
+            "(схемы ftp://, file:// и прочие запрещены)"
+        )
+    host = parsed.hostname or ""
+    if host in _BLOCKED_HOSTS:
+        raise ValueError(
+            f"base_url не может указывать на внутренний адрес ({host}): "
+            "это запрещено в целях безопасности"
+        )
+    if host.endswith(".local") or "metadata" in host:
+        raise ValueError(
+            f"base_url не может указывать на внутренний/metadata-адрес ({host})"
+        )
+    return v
 
 
 # --- providers ---
@@ -12,12 +38,24 @@ class ProviderIn(BaseModel):
     api_key: str = ""  # write-only
     enabled: bool = True
 
+    @field_validator("base_url")
+    @classmethod
+    def base_url_ssrf_guard(cls, v: str) -> str:
+        return _validate_base_url(v)
+
 
 class ProviderUpdate(BaseModel):
     base_url: str | None = Field(default=None, max_length=500)
     auth_style: Literal["bearer", "x_api_key"] | None = None
     api_key: str | None = None  # None/пусто = не менять ключ
     enabled: bool | None = None
+
+    @field_validator("base_url")
+    @classmethod
+    def base_url_ssrf_guard(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return _validate_base_url(v)
 
 
 class ProviderOut(BaseModel):

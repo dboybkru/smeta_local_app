@@ -49,7 +49,7 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     user = db.get(User, int(payload["sub"]))
-    if user is None or user.status == "blocked":
+    if user is None or user.status != "active":
         raise HTTPException(
             status_code=401,
             detail="Недействительный refresh-токен",
@@ -58,8 +58,15 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
     return service.issue_tokens(user)
 
 
+@router.get("/config")
+def auth_config():
+    return {"yandex_enabled": bool(settings.yandex_client_id)}
+
+
 @router.get("/yandex/login")
 def yandex_login():
+    if not settings.yandex_client_id:
+        raise HTTPException(status_code=503, detail="Вход через Яндекс не настроен")
     state = secrets.token_urlsafe(24)
     resp = RedirectResponse(yandex.build_authorize_url(state))
     resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax", secure=True)

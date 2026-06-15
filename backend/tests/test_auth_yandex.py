@@ -1,5 +1,14 @@
+import pytest
 import respx
 from httpx import Response
+
+
+@pytest.fixture(autouse=True)
+def _yandex_client_id(monkeypatch):
+    """Все тесты в этом модуле требуют непустого yandex_client_id."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "yandex_client_id", "test-yandex-client-id")
+    monkeypatch.setattr(settings, "yandex_client_secret", "test-yandex-secret")
 
 
 def test_yandex_login_redirects_with_state(client):
