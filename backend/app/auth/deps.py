@@ -34,7 +34,7 @@ def require_active(user: User = Depends(get_current_user)) -> User:
 
 
 def require_admin(user: User = Depends(require_active)) -> User:
-    if user.role != "admin":
+    if not (user.is_superuser or user.role == "org_admin"):
         raise HTTPException(status_code=403, detail="Нужны права администратора")
     return user
 
@@ -42,4 +42,18 @@ def require_admin(user: User = Depends(require_active)) -> User:
 def require_superuser(user: User = Depends(require_active)) -> User:
     if not user.is_superuser:
         raise HTTPException(status_code=403, detail="Нужны права суперпользователя")
+    return user
+
+
+def current_org(user: User = Depends(require_active)) -> int:
+    if user.org_id is None:
+        raise HTTPException(
+            status_code=403, detail="Аккаунт не привязан к организации"
+        )
+    return user.org_id
+
+
+def require_org_admin(user: User = Depends(require_active)) -> User:
+    if not (user.is_superuser or user.role == "org_admin"):
+        raise HTTPException(status_code=403, detail="Нужны права администратора организации")
     return user
