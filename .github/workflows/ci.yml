@@ -12,6 +12,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -33,5 +34,6 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run test
       - run: npm run build

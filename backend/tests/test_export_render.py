@@ -61,3 +61,4 @@ def test_html_to_pdf_signature(db_session):
     except OSError:
         pytest.skip("системные библиотеки weasyprint недоступны")
     assert pdf[:4] == b"%PDF"
+    assert len(pdf) > 1000
