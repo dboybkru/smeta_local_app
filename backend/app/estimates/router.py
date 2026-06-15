@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import current_org, require_active
@@ -212,11 +213,11 @@ def add_line(
     section = service.get_owned_section(db, section_id, user)
     service.require_write(section.branch.estimate, user)
     if body.item_id is not None:
-        from sqlalchemy import select as _select
+        org_id = user.org_id
         item = db.scalar(
-            _select(CatalogItem).where(
+            select(CatalogItem).where(
                 CatalogItem.id == body.item_id,
-                CatalogItem.org_id == section.branch.estimate.org_id,
+                CatalogItem.org_id == org_id,
             )
         )
         if item is None:
@@ -224,7 +225,7 @@ def add_line(
         est = section.branch.estimate
         client = db.get(models.Client, est.client_id) if est.client_id else None
         work, material, purchase = service.snapshot_line_values(
-            db, item, client, org_id=user.org_id
+            db, item, client, org_id=org_id
         )
         line = models.EstimateLine(
             section_id=section.id,

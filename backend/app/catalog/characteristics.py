@@ -25,12 +25,14 @@ EXTRACT_SCHEMA = {
 }
 
 
-def _remaining(db: Session, supplier_id: int | None, org_id: int | None = None) -> int:
-    q = select(func.count()).select_from(CatalogItem).where(CatalogItem.characteristics.is_(None))
+def _remaining(db: Session, supplier_id: int | None, org_id: int) -> int:
+    q = (
+        select(func.count())
+        .select_from(CatalogItem)
+        .where(CatalogItem.characteristics.is_(None), CatalogItem.org_id == org_id)
+    )
     if supplier_id is not None:
         q = q.where(CatalogItem.supplier_id == supplier_id)
-    if org_id is not None:
-        q = q.where(CatalogItem.org_id == org_id)
     return db.scalar(q) or 0
 
 
@@ -38,17 +40,18 @@ def extract_batch(
     db: Session,
     batch: int = 40,
     supplier_id: int | None = None,
-    org_id: int | None = None,
+    *,
+    org_id: int,
 ) -> dict:
     """Извлекает характеристики для одной пачки позиций без characteristics.
 
     Возвращает {"processed": N, "remaining": M}. Позиции, по которым AI ничего не
     вернул, помечаются пустым {} (обработаны), чтобы не зациклить."""
-    q = select(CatalogItem).where(CatalogItem.characteristics.is_(None))
+    q = select(CatalogItem).where(
+        CatalogItem.characteristics.is_(None), CatalogItem.org_id == org_id
+    )
     if supplier_id is not None:
         q = q.where(CatalogItem.supplier_id == supplier_id)
-    if org_id is not None:
-        q = q.where(CatalogItem.org_id == org_id)
     items = list(db.scalars(q.order_by(CatalogItem.id).limit(batch)).all())
     if not items:
         return {"processed": 0, "remaining": 0}
