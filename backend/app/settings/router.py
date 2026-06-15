@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_admin
+from app.auth.deps import require_superuser as require_admin
 from app.auth.models import User
 from app.core.db import get_db
 from app.settings import service

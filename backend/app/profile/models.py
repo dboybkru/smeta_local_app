@@ -11,7 +11,7 @@ class CompanyProfile(Base):
     __tablename__ = "company_profiles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), unique=True, index=True)
     org_name: Mapped[str] = mapped_column(String(500), default="")
     inn: Mapped[str] = mapped_column(String(20), default="")
     # contacts: {"phone","email","address","site"}

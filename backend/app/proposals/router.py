@@ -20,7 +20,7 @@ def generate(
 ):
     est = est_service.get_owned_estimate(db, estimate_id, user)
     est_service.require_write(est, user)
-    profile = profile_service.get_profile(db, user.id)
+    profile = profile_service.get_profile(db, est.org_id)
     try:
         blocks = service.generate_proposal(db, est, profile)
     except AINotConfigured:

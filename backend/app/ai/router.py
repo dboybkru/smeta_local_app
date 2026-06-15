@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.ai import client, crypto, router_advisor, schemas, service
 from app.ai.errors import AIError, AINotConfigured
 from app.ai.models import AIModel, AIProvider, AIPurpose, AIUsage
-from app.auth.deps import require_admin
+from app.auth.deps import require_superuser as require_admin
 from app.auth.models import User
 from app.core.db import get_db
 
