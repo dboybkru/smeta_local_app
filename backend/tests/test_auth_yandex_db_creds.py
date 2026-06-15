@@ -14,7 +14,7 @@ from app.settings.router import YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET
 
 
 def _admin(db):
-    u = User(email="adm_yxdb@x.ru", name="A", role="admin", status="active")
+    u = User(email="adm_yxdb@x.ru", name="A", role="org_admin", status="active")
     db.add(u)
     db.commit()
     return u

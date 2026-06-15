@@ -23,8 +23,17 @@ class InvalidCredentialsError(Exception):
 
 
 def register_user(db: Session, email: str, password: str, name: str) -> User:
-    email = email.lower()
-    if db.scalar(select(User).where(User.email == email)):
+    email = email.strip().lower()
+    existing = db.scalar(select(User).where(User.email == email))
+    if existing is not None:
+        # Claim: invited row без пароля — отдаём её пользователю.
+        if existing.status == "invited" and not existing.password_hash:
+            existing.password_hash = hash_password(password)
+            existing.name = name or existing.name
+            existing.status = "active"
+            db.commit()
+            db.refresh(existing)
+            return existing
         raise EmailTakenError(email)
     # Гонка двух первых регистраций не закрыта на уровне БД —
     # приемлемо: оператор регистрируется первым при деплое.
@@ -33,8 +42,10 @@ def register_user(db: Session, email: str, password: str, name: str) -> User:
         email=email,
         password_hash=hash_password(password),
         name=name,
-        role="admin" if is_first else "estimator",
+        role="org_admin" if is_first else "estimator",
         status="active" if is_first else "pending",
+        is_superuser=is_first,
+        org_id=None,
     )
     db.add(user)
     db.commit()
@@ -63,7 +74,7 @@ def authenticate(db: Session, email: str, password: str) -> User:
 
 def get_or_create_yandex_user(db: Session, info: dict) -> User:
     yandex_id = str(info["id"])
-    email = (info.get("default_email") or f"{yandex_id}@yandex.local").lower()
+    email = (info.get("default_email") or f"{yandex_id}@yandex.local").strip().lower()
     user = db.scalar(select(User).where(User.yandex_id == yandex_id))
     if user:
         return user
@@ -72,7 +83,13 @@ def get_or_create_yandex_user(db: Session, info: dict) -> User:
     # адреса — пересмотреть (линковать только *@yandex.*).
     user = db.scalar(select(User).where(User.email == email))
     if user:
-        user.yandex_id = yandex_id
+        # Claim: invited row без yandex_id — привязываем.
+        if user.status == "invited" and not user.yandex_id:
+            user.yandex_id = yandex_id
+            user.name = user.name or info.get("real_name") or ""
+            user.status = "active"
+        else:
+            user.yandex_id = yandex_id
         db.commit()
         db.refresh(user)
         return user
@@ -81,8 +98,10 @@ def get_or_create_yandex_user(db: Session, info: dict) -> User:
         email=email,
         yandex_id=yandex_id,
         name=info.get("real_name") or "",
-        role="admin" if is_first else "estimator",
+        role="org_admin" if is_first else "estimator",
         status="active" if is_first else "pending",
+        is_superuser=is_first,
+        org_id=None,
     )
     db.add(user)
     db.commit()

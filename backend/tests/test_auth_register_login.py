@@ -8,7 +8,7 @@ def test_first_user_becomes_active_admin(client):
     resp = register(client)
     assert resp.status_code == 201
     body = resp.json()
-    assert body["role"] == "admin"
+    assert body["role"] == "org_admin"
     assert body["status"] == "active"
 
 

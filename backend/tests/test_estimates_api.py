@@ -34,7 +34,7 @@ def test_owner_sees_only_own_estimates(client, db_session):
 
 def test_admin_sees_all_estimates(client, db_session):
     a = _user(db_session, email="a@x.ru")
-    admin = _user(db_session, role="admin", email="adm@x.ru")
+    admin = _user(db_session, role="org_admin", email="adm@x.ru")
     client.post("/api/estimates", json={"object_name": "A"}, headers=_hdr(a))
     r = client.get("/api/estimates", headers=_hdr(admin))
     assert len(r.json()) == 1
