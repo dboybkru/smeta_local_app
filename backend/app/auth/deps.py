@@ -37,3 +37,9 @@ def require_admin(user: User = Depends(require_active)) -> User:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Нужны права администратора")
     return user
+
+
+def require_superuser(user: User = Depends(require_active)) -> User:
+    if not user.is_superuser:
+        raise HTTPException(status_code=403, detail="Нужны права суперпользователя")
+    return user

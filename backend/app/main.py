@@ -11,6 +11,7 @@ from app.estimates.router import router as estimates_router
 from app.export.router import router as export_router
 from app.jobs.router import router as jobs_router
 from app.jobs.worker import start_worker, stop_worker
+from app.orgs.router import router as orgs_router
 from app.profile.router import router as profile_router
 from app.proposals.router import router as proposals_router
 from app.publiclinks.public_router import router as public_page_router
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SmetaApp API", lifespan=lifespan)
+app.include_router(orgs_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(catalog_router)
