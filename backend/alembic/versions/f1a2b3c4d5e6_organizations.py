@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("name", name="uq_organizations_name"),
     )
     op.execute(
-        "INSERT INTO organizations (name, created_at) VALUES ('Организация', now())"
+        "INSERT INTO organizations (name, created_at) VALUES ('Организация', CURRENT_TIMESTAMP)"
     )
     op.add_column("users", sa.Column(
         "is_superuser", sa.Boolean(), nullable=False, server_default=sa.text("false")))

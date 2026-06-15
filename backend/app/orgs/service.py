@@ -25,3 +25,7 @@ def create_org(db: Session, name: str) -> Organization:
 
 def get_org(db: Session, org_id: int) -> Organization | None:
     return db.get(Organization, org_id)
+
+
+def count_users(db: Session, org_id: int) -> int:
+    return db.scalar(select(func.count(User.id)).where(User.org_id == org_id)) or 0
