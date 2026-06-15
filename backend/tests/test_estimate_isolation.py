@@ -101,3 +101,82 @@ def test_line_not_accessible_across_orgs(client, db_session):
         headers=_hdr(ua),
     )
     assert r.status_code == 200, f"org A должен иметь доступ, получен {r.status_code}: {r.text}"
+
+
+def test_client_id_cross_org_leak_on_create(client, db_session):
+    """org B не может создать смету с client_id, принадлежащим org A (межорг-утечка реквизитов)."""
+    oa, ua = _org_user(db_session, "CIA")
+    ob, ub = _org_user(db_session, "CIB")
+
+    # Создаём клиента в org A через API
+    r = client.post(
+        "/api/clients",
+        json={"name": "Клиент Орг А"},
+        headers=_hdr(ua),
+    )
+    assert r.status_code == 201, r.text
+    client_a_id = r.json()["id"]
+
+    # org B пытается создать смету с client_id = клиент org A — должен получить 404
+    r = client.post(
+        "/api/estimates",
+        json={"object_name": "Объект B", "client_id": client_a_id},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 404, (
+        f"Ожидался 404 при использовании чужого client_id на create, получен {r.status_code}: {r.text}"
+    )
+
+
+def test_client_id_cross_org_leak_on_patch(client, db_session):
+    """org B не может PATCH сметы с client_id org A; но может использовать свой client_id."""
+    oa, ua = _org_user(db_session, "PIA")
+    ob, ub = _org_user(db_session, "PIB")
+
+    # Создаём клиента в org A
+    r = client.post(
+        "/api/clients",
+        json={"name": "Клиент Орг А (patch)"},
+        headers=_hdr(ua),
+    )
+    assert r.status_code == 201, r.text
+    client_a_id = r.json()["id"]
+
+    # org B создаёт смету БЕЗ client_id — должно пройти успешно
+    r = client.post(
+        "/api/estimates",
+        json={"object_name": "Объект B без клиента"},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 201, (
+        f"Ожидался 201 при создании сметы без client_id, получен {r.status_code}: {r.text}"
+    )
+    est_b_id = r.json()["id"]
+
+    # org B пытается PATCH смету с client_id = клиент org A — должен получить 404
+    r = client.patch(
+        f"/api/estimates/{est_b_id}",
+        json={"client_id": client_a_id},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 404, (
+        f"Ожидался 404 при PATCH с чужим client_id, получен {r.status_code}: {r.text}"
+    )
+
+    # Позитивный контроль: org B создаёт своего клиента и PATCH со своим client_id — успех
+    r = client.post(
+        "/api/clients",
+        json={"name": "Клиент Орг B"},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 201, r.text
+    client_b_id = r.json()["id"]
+
+    r = client.patch(
+        f"/api/estimates/{est_b_id}",
+        json={"client_id": client_b_id},
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 200, (
+        f"org B должна иметь возможность использовать своего клиента, получен {r.status_code}: {r.text}"
+    )
