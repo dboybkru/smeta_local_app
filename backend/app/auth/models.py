@@ -21,6 +21,10 @@ class User(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), index=True)
+    invite_token: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    invite_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
