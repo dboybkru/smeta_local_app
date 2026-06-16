@@ -423,7 +423,8 @@ def start_extract_characteristics(
             q = q.where(CatalogItem.supplier_id == supplier_id)
         db.execute(q)
         db.commit()
-    job = Job(type="catalog_extract", params={"supplier_id": supplier_id, "org_id": org})
+    job = Job(type="catalog_extract", org_id=org,
+              params={"supplier_id": supplier_id, "org_id": org})
     db.add(job)
     db.commit()
     db.refresh(job)
