@@ -113,7 +113,10 @@ def yandex_login(db: Session = Depends(get_db)):
         raise HTTPException(status_code=503, detail="Вход через Яндекс не настроен")
     state = secrets.token_urlsafe(24)
     resp = RedirectResponse(yandex.build_authorize_url(state, cid))
-    resp.set_cookie("yx_state", state, max_age=600, httponly=True, samesite="lax", secure=True)
+    resp.set_cookie(
+        "yx_state", state, max_age=600, httponly=True,
+        samesite="lax", secure=settings.cookie_secure,
+    )
     return resp
 
 
