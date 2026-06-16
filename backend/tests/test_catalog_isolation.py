@@ -1,4 +1,5 @@
 """Org-isolation tests for the catalog domain (Task 5)."""
+import json
 from decimal import Decimal
 
 import pytest
@@ -173,3 +174,77 @@ def test_add_line_cross_org_item_rejected(client, db_session):
         headers=_hdr(ub),
     )
     assert r.status_code == 404, f"Expected 404, got {r.status_code}: {r.text}"
+
+
+def test_import_cross_org_price_level_rejected(client, db_session):
+    """Импорт с price_cols, ссылающимся на чужой PriceLevel, должен вернуть 422."""
+    from tests.catalog_files import make_bolid_xlsx
+
+    oa, ua = _org_admin(db_session, "IMP_A")
+    ob, ub = _org_admin(db_session, "IMP_B")
+
+    # Создаём PriceLevel у org A
+    level_a_resp = client.post(
+        "/api/price-levels", json={"name": "Розница"}, headers=_hdr(ua)
+    )
+    assert level_a_resp.status_code == 201, level_a_resp.text
+    level_a_id = level_a_resp.json()["id"]
+
+    # Создаём поставщика у org B
+    sup_b_resp = client.post("/api/suppliers", json={"name": "ПоставщикБ"}, headers=_hdr(ub))
+    assert sup_b_resp.status_code == 201, sup_b_resp.text
+    sup_b_id = sup_b_resp.json()["id"]
+
+    # Org B пытается импортировать с маппингом, ссылающимся на level_id org A
+    mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {level_a_id: 3}}
+    r = client.post(
+        "/api/catalog/import",
+        files={"file": ("bolid.xlsx", make_bolid_xlsx())},
+        data={
+            "supplier_id": str(sup_b_id),
+            "kind": "material",
+            "sheet_mappings": json.dumps([{"name": "Болид", "mapping": mapping}]),
+            "use_sheet_as_category": "false",
+            "save_mapping": "false",
+        },
+        headers=_hdr(ub),
+    )
+    assert r.status_code == 422, f"Expected 422, got {r.status_code}: {r.text}"
+    assert "уровень цены" in r.json()["detail"].lower()
+
+    # Убеждаемся, что ничего не импортировалось
+    items_b = client.get("/api/catalog/items", headers=_hdr(ub)).json()["items"]
+    assert len(items_b) == 0, "Импорт не должен был создать позиции"
+
+
+def test_import_own_price_level_succeeds(client, db_session):
+    """Импорт со своим PriceLevel должен проходить успешно (регрессия)."""
+    from tests.catalog_files import make_bolid_xlsx
+
+    oa, ua = _org_admin(db_session, "IMP_OWN")
+
+    level_resp = client.post(
+        "/api/price-levels", json={"name": "Розница"}, headers=_hdr(ua)
+    )
+    assert level_resp.status_code == 201, level_resp.text
+    level_id = level_resp.json()["id"]
+
+    sup_resp = client.post("/api/suppliers", json={"name": "Болид"}, headers=_hdr(ua))
+    assert sup_resp.status_code == 201, sup_resp.text
+    sup_id = sup_resp.json()["id"]
+
+    mapping = {"name_col": 0, "article_col": 2, "header_row": 0, "price_cols": {level_id: 3}}
+    r = client.post(
+        "/api/catalog/import",
+        files={"file": ("bolid.xlsx", make_bolid_xlsx())},
+        data={
+            "supplier_id": str(sup_id),
+            "kind": "material",
+            "sheet_mappings": json.dumps([{"name": "Болид", "mapping": mapping}]),
+            "use_sheet_as_category": "false",
+            "save_mapping": "false",
+        },
+        headers=_hdr(ua),
+    )
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    assert r.json()["items_created"] == 3
