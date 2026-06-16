@@ -24,6 +24,9 @@ class UserOut(BaseModel):
     name: str
     role: str
     status: str
+    is_superuser: bool = False
+    org_id: int | None = None
+    org_name: str | None = None
 
 
 class TokenPair(BaseModel):

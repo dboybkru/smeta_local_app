@@ -9,6 +9,7 @@ import EstimatesListPage from "./pages/EstimatesListPage";
 import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
 import LoginPage from "./pages/LoginPage";
+import OrgsPage from "./pages/OrgsPage";
 import PriceLevelsPage from "./pages/PriceLevelsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AiConfigPage from "./pages/AiConfigPage";
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/admin/suppliers" element={<SuppliersPage />} />
         <Route path="/admin/ai" element={<AiConfigPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/admin/orgs" element={<OrgsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
     </Routes>

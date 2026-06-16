@@ -117,7 +117,7 @@ describe("ImportPage", () => {
     });
     vi.stubGlobal("fetch", f);
     vi.spyOn(authModule, "useAuth").mockReturnValue({
-      user: { id: 1, email: "a@b.c", name: "A", role: "admin", status: "active" },
+      user: { id: 1, email: "a@b.c", name: "A", role: "admin", status: "active", is_superuser: false, org_id: null, org_name: null },
       loginWithPassword: vi.fn(), acceptTokens: vi.fn(), logout: vi.fn(),
     });
     render(<MemoryRouter><AuthProvider><ImportPage /></AuthProvider></MemoryRouter>);
