@@ -18,7 +18,10 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.add_column("jobs", sa.Column("org_id", sa.Integer(), nullable=True))
-    op.execute("UPDATE jobs SET org_id = (params->>'org_id')::int WHERE params ? 'org_id'")
+    op.execute(
+        "UPDATE jobs SET org_id = (params->>'org_id')::int "
+        "WHERE params->>'org_id' IS NOT NULL"
+    )
     op.execute(
         "UPDATE jobs SET org_id = (SELECT min(id) FROM organizations) WHERE org_id IS NULL"
     )
