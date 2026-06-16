@@ -1,6 +1,11 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+class InviteAcceptIn(BaseModel):
+    name: str = ""
+    password: str = Field(min_length=8)
+
+
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)

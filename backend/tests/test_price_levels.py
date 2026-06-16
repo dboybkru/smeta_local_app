@@ -107,14 +107,19 @@ def test_delete_level_in_use_409(client, db_session):
 
 
 def test_non_admin_cannot_write_levels(client, db_session):
+    from app.auth.models import User
+    from app.core.security import hash_password
+
     make_admin(client, db_session)
-    client.post(
-        "/api/auth/register",
-        json={"email": "user@test.ru", "password": "secret123", "name": "Ю"},
+    # После бутстрапа регистрация закрыта — создаём пользователя напрямую в БД
+    u = User(
+        email="user@test.ru",
+        password_hash=hash_password("secret123"),
+        name="Ю",
+        role="estimator",
+        status="active",
     )
-    resp = client.post("/api/auth/login", json={"email": "user@test.ru", "password": "secret123"})
-    assert resp.status_code == 200
-    user_data = resp.json()
-    client.cookies.clear()
-    user = {"Authorization": f"Bearer {create_access_token(user_data['id'], user_data['role'])}"}
+    db_session.add(u)
+    db_session.commit()
+    user = {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
     assert client.post("/api/price-levels", json={"name": "X"}, headers=user).status_code == 403

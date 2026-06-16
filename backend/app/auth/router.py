@@ -1,18 +1,20 @@
 import secrets
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import service, yandex
 from app.auth.cookies import clear_auth_cookies, set_auth_cookies
 from app.auth.deps import get_current_user
 from app.auth.models import User
-from app.auth.schemas import LoginIn, RefreshIn, RegisterIn, UserOut
+from app.auth.schemas import InviteAcceptIn, LoginIn, RefreshIn, RegisterIn, UserOut
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.security import InvalidTokenError, decode_token
+from app.core.security import InvalidTokenError, decode_token, hash_password
 from app.orgs.models import Organization
 from app.settings import service as settings_service
 from app.settings.router import YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET
@@ -42,8 +44,52 @@ def _user_out(db: Session, user: User) -> UserOut:
     )
 
 
+def _is_expired(expires_at: datetime | None) -> bool:
+    """Compare expires_at with now(UTC), handling both naive and aware datetimes."""
+    if expires_at is None:
+        return False
+    now = datetime.now(UTC)
+    if expires_at.tzinfo is None:
+        now = now.replace(tzinfo=None)
+    return expires_at < now
+
+
+@router.get("/invite/{token}")
+def invite_info(token: str, db: Session = Depends(get_db)):
+    u = db.scalar(select(User).where(User.invite_token == token))
+    if u is None or u.status != "invited":
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    if _is_expired(u.invite_expires_at):
+        raise HTTPException(status_code=410, detail="Срок приглашения истёк")
+    org = db.get(Organization, u.org_id) if u.org_id else None
+    return {"email": u.email, "org_name": org.name if org else None, "role": u.role}
+
+
+@router.post("/invite/{token}/accept", response_model=UserOut)
+def invite_accept(
+    token: str, body: InviteAcceptIn, response: Response, db: Session = Depends(get_db)
+):
+    u = db.scalar(select(User).where(User.invite_token == token))
+    if u is None or u.status != "invited":
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    if _is_expired(u.invite_expires_at):
+        raise HTTPException(status_code=410, detail="Срок приглашения истёк")
+    u.password_hash = hash_password(body.password)
+    u.name = body.name or u.name
+    u.status = "active"
+    u.invite_token = None
+    u.invite_expires_at = None
+    db.commit()
+    db.refresh(u)
+    t = service.issue_tokens(u)
+    set_auth_cookies(response, t["access_token"], t["refresh_token"])
+    return _user_out(db, u)
+
+
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(body: RegisterIn, response: Response, db: Session = Depends(get_db)):
+    if db.scalar(select(func.count()).select_from(User)):
+        raise HTTPException(status_code=403, detail="Регистрация только по приглашению")
     try:
         user = service.register_user(db, body.email, body.password, body.name)
     except service.EmailTakenError:

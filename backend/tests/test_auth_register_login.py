@@ -12,19 +12,18 @@ def test_first_user_becomes_active_admin(client):
     assert body["status"] == "active"
 
 
-def test_second_user_is_pending_estimator(client):
+def test_second_user_is_invite_only(client):
+    """После бутстрапа первого юзера открытая регистрация закрыта → 403."""
     register(client, email="first@test.ru")
     resp = register(client, email="second@test.ru")
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["role"] == "estimator"
-    assert body["status"] == "pending"
+    assert resp.status_code == 403
 
 
-def test_duplicate_email_rejected(client):
+def test_duplicate_email_rejected(client, db_session):
+    """Регистрация заблокирована после первого юзера → 403 (не 409, т.к. check invite-only раньше)."""
     register(client)
     resp = register(client)
-    assert resp.status_code == 409
+    assert resp.status_code == 403
 
 
 def test_login_returns_user_out(client):
@@ -70,6 +69,7 @@ def test_login_email_case_insensitive(client):
 
 
 def test_register_duplicate_email_case_insensitive(client):
+    """После бутстрапа регистрация закрыта → 403 (invite-only check раньше duplicate check)."""
     register(client, email="user@test.ru")
     resp = register(client, email="User@test.ru")
-    assert resp.status_code == 409
+    assert resp.status_code == 403
