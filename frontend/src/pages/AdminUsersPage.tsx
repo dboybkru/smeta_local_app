@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
-import type { User } from "../auth/AuthContext";
+import { useAuth } from "../auth/AuthContext";
+import { listOrgUsers, updateOrgUser } from "../api/orgs";
+import type { OrgUser } from "../api/orgs";
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const { user } = useAuth();
+  const [users, setUsers] = useState<OrgUser[]>([]);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  const orgId = user?.org_id ?? null;
+
   async function load() {
+    if (orgId == null) return;
     try {
-      setUsers(await api<User[]>("/admin/users"));
+      setUsers(await listOrgUsers(orgId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     }
@@ -17,22 +22,30 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
 
   async function setStatus(id: number, status: "active" | "blocked") {
+    if (orgId == null) return;
     setBusyId(id);
     setError("");
     try {
-      await api(`/admin/users/${id}/status`, {
-        method: "POST",
-        body: JSON.stringify({ status }),
-      });
+      await updateOrgUser(orgId, id, { status });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка изменения статуса");
     } finally {
       setBusyId(null);
     }
+  }
+
+  if (orgId == null) {
+    return (
+      <div className="p-8">
+        <h1 className="mb-4 font-serif text-xl text-stone-900">Пользователи</h1>
+        <p className="text-stone-500">Аккаунт не привязан к организации.</p>
+      </div>
+    );
   }
 
   return (
