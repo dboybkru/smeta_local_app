@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.ai import client, crypto, router_advisor, schemas, service
 from app.ai.errors import AIError, AINotConfigured
 from app.ai.models import AIModel, AIProvider, AIPurpose, AIUsage
-from app.auth.deps import require_superuser as require_admin
+from app.auth.deps import require_superuser
 from app.auth.models import User
 from app.core.db import get_db
 
@@ -21,7 +21,7 @@ def _provider_out(p: AIProvider) -> schemas.ProviderOut:
 
 # --- providers ---
 @router.get("/providers", response_model=list[schemas.ProviderOut])
-def list_providers(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def list_providers(db: Session = Depends(get_db), user: User = Depends(require_superuser)):
     return [_provider_out(p) for p in db.scalars(select(AIProvider).order_by(AIProvider.id)).all()]
 
 
@@ -29,7 +29,7 @@ def list_providers(db: Session = Depends(get_db), user: User = Depends(require_a
 def create_provider(
     body: schemas.ProviderIn,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     p = AIProvider(
         name=body.name, base_url=body.base_url, auth_style=body.auth_style,
@@ -47,7 +47,7 @@ def update_provider(
     provider_id: int,
     body: schemas.ProviderUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     p = db.get(AIProvider, provider_id)
     if p is None:
@@ -68,7 +68,7 @@ def update_provider(
 def delete_provider(
     provider_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     p = db.get(AIProvider, provider_id)
     if p is None:
@@ -82,7 +82,7 @@ def delete_provider(
 def refresh_models(
     provider_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     p = db.get(AIProvider, provider_id)
     if p is None:
@@ -127,7 +127,7 @@ def refresh_models(
 def list_models(
     provider_id: int | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     q = select(AIModel).order_by(AIModel.id)
     if provider_id is not None:
@@ -140,7 +140,7 @@ def update_model(
     model_id: int,
     body: schemas.ModelUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     m = db.get(AIModel, model_id)
     if m is None:
@@ -156,7 +156,7 @@ def update_model(
 def delete_all_models(
     provider_id: int | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     """Массовое удаление моделей (опц. по провайдеру). Сначала обнуляет ссылки
     целей на удаляемые модели, чтобы не нарушить внешний ключ."""
@@ -185,7 +185,7 @@ def delete_all_models(
 def delete_model(
     model_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     m = db.get(AIModel, model_id)
     if m is None:
@@ -196,7 +196,7 @@ def delete_model(
 
 # --- purposes ---
 @router.get("/purposes", response_model=list[schemas.PurposeOut])
-def list_purposes(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def list_purposes(db: Session = Depends(get_db), user: User = Depends(require_superuser)):
     return db.scalars(select(AIPurpose).order_by(AIPurpose.id)).all()
 
 
@@ -205,7 +205,7 @@ def update_purpose(
     key: str,
     body: schemas.PurposeUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     purpose = db.scalars(select(AIPurpose).where(AIPurpose.key == key)).first()
     if purpose is None:
@@ -219,7 +219,7 @@ def update_purpose(
 
 # --- router advisor ---
 @router.post("/router/recommend", response_model=list[schemas.Recommendation])
-def router_recommend(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def router_recommend(db: Session = Depends(get_db), user: User = Depends(require_superuser)):
     try:
         return router_advisor.recommend_models(db)
     except AINotConfigured as exc:
@@ -238,7 +238,7 @@ _SMOKE_MAX_TOKENS = 1000
 def test_purpose(
     key: str,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     try:
         service.call_llm(
@@ -254,7 +254,7 @@ def test_purpose(
 def test_model(
     model_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    user: User = Depends(require_superuser),
 ):
     m = db.get(AIModel, model_id)
     if m is None:
@@ -275,7 +275,7 @@ def test_model(
 
 # --- usage / costs ---
 @router.get("/usage", response_model=schemas.UsageSummary)
-def usage_summary(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def usage_summary(db: Session = Depends(get_db), user: User = Depends(require_superuser)):
     rows = db.execute(
         select(
             AIUsage.provider_name,
@@ -304,6 +304,6 @@ def usage_summary(db: Session = Depends(get_db), user: User = Depends(require_ad
 
 
 @router.delete("/usage", status_code=204)
-def clear_usage(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+def clear_usage(db: Session = Depends(get_db), user: User = Depends(require_superuser)):
     db.execute(delete(AIUsage))
     db.commit()
