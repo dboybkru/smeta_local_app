@@ -73,3 +73,48 @@ def set_yandex(
     if body.secret.strip():
         service.set_secret(db, YANDEX_CLIENT_SECRET, body.secret.strip())
     return _yandex_status(db)
+
+
+SMTP_KEYS = {
+    "host": "smtp_host",
+    "port": "smtp_port",
+    "user": "smtp_user",
+    "from_addr": "smtp_from",
+    "tls": "smtp_tls",
+}
+SMTP_PASSWORD = "smtp_password"
+
+
+class SmtpIn(BaseModel):
+    host: str = ""
+    port: str = ""
+    user: str = ""
+    password: str = ""
+    from_addr: str = ""
+    tls: str = ""
+
+
+def _smtp_status(db: Session) -> dict:
+    out = {field: service.get_secret(db, key) for field, key in SMTP_KEYS.items()}
+    out["has_password"] = service.has_secret(db, SMTP_PASSWORD)
+    return out
+
+
+@router.get("/smtp", dependencies=[Depends(require_superuser)])
+def get_smtp(db: Session = Depends(get_db)):
+    return _smtp_status(db)
+
+
+@router.put("/smtp")
+def set_smtp(
+    body: SmtpIn,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_superuser),
+):
+    for field, key in SMTP_KEYS.items():
+        val = getattr(body, field).strip()
+        if val:
+            service.set_secret(db, key, val)
+    if body.password.strip():
+        service.set_secret(db, SMTP_PASSWORD, body.password.strip())
+    return _smtp_status(db)
