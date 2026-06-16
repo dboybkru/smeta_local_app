@@ -1,10 +1,15 @@
+import secrets
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_org_admin, require_superuser
 from app.auth.models import ROLES, User
+from app.core.config import settings
 from app.core.db import get_db
+from app.email import sender as email_sender
 from app.orgs import service
 from app.orgs.models import Organization
 from app.orgs.schemas import InviteIn, OrgIn, OrgOut, UpdateUserIn
@@ -70,7 +75,20 @@ def invite_user(
     db.add(u)
     db.commit()
     db.refresh(u)
-    return {"id": u.id, "email": u.email, "role": u.role, "status": u.status}
+    u.invite_token = secrets.token_urlsafe(32)
+    u.invite_expires_at = datetime.now(UTC) + timedelta(days=7)
+    db.commit()
+    db.refresh(u)
+    org = db.get(Organization, org_id)
+    link = f"{settings.frontend_url}/invite/{u.invite_token}"
+    email_sent = False
+    try:
+        email_sender.send_invite_email(db, u.email, org.name if org else "", link)
+        email_sent = True
+    except (email_sender.EmailNotConfigured, email_sender.EmailError):
+        email_sent = False
+    return {"id": u.id, "email": u.email, "role": u.role, "status": u.status,
+            "email_sent": email_sent, "invite_link": link}
 
 
 @router.get("/{org_id}/users")
@@ -110,3 +128,30 @@ def update_org_user(
     db.commit()
     db.refresh(u)
     return {"id": u.id, "email": u.email, "role": u.role, "status": u.status}
+
+
+@router.post("/{org_id}/users/{uid}/resend-invite")
+def resend_invite(
+    org_id: int,
+    uid: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_org_admin),
+):
+    if not actor.is_superuser and actor.org_id != org_id:
+        raise HTTPException(status_code=403, detail="Чужая организация")
+    u = db.get(User, uid)
+    if u is None or u.org_id != org_id or u.status != "invited":
+        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+    u.invite_token = secrets.token_urlsafe(32)
+    u.invite_expires_at = datetime.now(UTC) + timedelta(days=7)
+    db.commit()
+    org = db.get(Organization, org_id)
+    link = f"{settings.frontend_url}/invite/{u.invite_token}"
+    email_sent = False
+    try:
+        email_sender.send_invite_email(db, u.email, org.name if org else "", link)
+        email_sent = True
+    except (email_sender.EmailNotConfigured, email_sender.EmailError):
+        email_sent = False
+    return {"id": u.id, "email": u.email, "status": u.status,
+            "email_sent": email_sent, "invite_link": link}
