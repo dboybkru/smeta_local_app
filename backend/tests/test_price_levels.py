@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from app.auth.models import User
+from app.core.security import create_access_token
 from app.orgs.models import Organization
 
 
@@ -22,7 +23,11 @@ def make_admin(client, db):
     resp = client.post(
         "/api/auth/login", json={"email": "admin@test.ru", "password": "secret123"}
     )
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert resp.status_code == 200
+    user_data = resp.json()
+    # Очищаем cookie-jar чтобы Bearer-заголовки не перекрывались cookie от login
+    client.cookies.clear()
+    return {"Authorization": f"Bearer {create_access_token(user_data['id'], user_data['role'])}"}
 
 
 def test_admin_creates_and_lists_levels(client, db_session):
@@ -108,5 +113,8 @@ def test_non_admin_cannot_write_levels(client, db_session):
         json={"email": "user@test.ru", "password": "secret123", "name": "Ю"},
     )
     resp = client.post("/api/auth/login", json={"email": "user@test.ru", "password": "secret123"})
-    user = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert resp.status_code == 200
+    user_data = resp.json()
+    client.cookies.clear()
+    user = {"Authorization": f"Bearer {create_access_token(user_data['id'], user_data['role'])}"}
     assert client.post("/api/price-levels", json={"name": "X"}, headers=user).status_code == 403

@@ -1,4 +1,8 @@
+from app.core.security import create_access_token, create_refresh_token
+
+
 def make_user(client, email="user@test.ru"):
+    """Регистрирует/логинит пользователя; возвращает dict с access_token/refresh_token для Bearer."""
     resp = client.post(
         "/api/auth/register",
         json={"email": email, "password": "secret123", "name": "Т"},
@@ -6,7 +10,17 @@ def make_user(client, email="user@test.ru"):
     assert resp.status_code == 201
     resp = client.post("/api/auth/login", json={"email": email, "password": "secret123"})
     assert resp.status_code == 200
-    return resp.json()
+    user_data = resp.json()
+    user_id = user_data["id"]
+    role = user_data["role"]
+    # Очищаем cookie-jar чтобы Bearer-заголовки не перекрывались cookie от login
+    client.cookies.clear()
+    return {
+        "access_token": create_access_token(user_id, role),
+        "refresh_token": create_refresh_token(user_id, role),
+        "id": user_id,
+        "role": role,
+    }
 
 
 def auth(tokens):
@@ -33,11 +47,13 @@ def test_refresh_returns_new_pair(client):
     tokens = make_user(client)
     resp = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert resp.status_code == 200
-    assert resp.json()["access_token"]
+    assert resp.json()["email"]  # UserOut теперь возвращает email, а не токены
 
 
 def test_refresh_rejects_access_token(client):
     tokens = make_user(client)
+    # Очищаем cookie чтобы проверить body-путь (cookie имеет приоритет)
+    client.cookies.clear()
     resp = client.post("/api/auth/refresh", json={"refresh_token": tokens["access_token"]})
     assert resp.status_code == 401
 
@@ -103,7 +119,7 @@ def test_active_user_can_refresh(client):
     tokens = make_user(client, email="active@test.ru")
     resp = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert resp.status_code == 200
-    assert resp.json()["access_token"]
+    assert resp.json()["email"]  # UserOut теперь возвращает email, а не токены
 
 
 # --- /api/auth/config ---
