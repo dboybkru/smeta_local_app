@@ -43,10 +43,12 @@ app = FastAPI(title="SmetaApp API", lifespan=lifespan)
 
 @app.middleware("http")
 async def csrf_protect(request: Request, call_next):
+    path = request.url.path
     if (
         request.method in _UNSAFE_METHODS
-        and request.url.path.startswith("/api/")
-        and request.url.path not in _CSRF_EXEMPT
+        and path.startswith("/api/")
+        and path not in _CSRF_EXEMPT
+        and not path.startswith("/api/auth/invite/")
         and request.cookies.get("access_token")  # только cookie-аутентификация
     ):
         cookie_csrf = request.cookies.get("csrf_token")

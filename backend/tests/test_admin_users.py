@@ -3,10 +3,12 @@
 Первый зарегистрированный пользователь автоматически получает is_superuser=True
 (см. app.auth.service.register_user). Все тесты, которым нужен суперпользователь,
 регистрируют его первым.
+После Task 5 открытая регистрация закрыта (invite-only), поэтому второй и последующий
+пользователи создаются через БД напрямую.
 """
 
 from app.auth.models import User
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password
 
 
 # ---------------------------------------------------------------------------
@@ -14,6 +16,7 @@ from app.core.security import create_access_token
 # ---------------------------------------------------------------------------
 
 def make_user(client, email):
+    """Bootstrap first user via register endpoint (only allowed when DB is empty)."""
     resp = client.post(
         "/api/auth/register", json={"email": email, "password": "secret123", "name": "Т"}
     )
@@ -27,6 +30,24 @@ def make_user(client, email):
         "access_token": create_access_token(user_data["id"], user_data["role"]),
         "id": user_data["id"],
         "role": user_data["role"],
+    }
+
+
+def make_user_db(db_session, email, status="pending", role="estimator"):
+    """Create additional users directly in DB (register endpoint is invite-only after bootstrap)."""
+    u = User(
+        email=email,
+        password_hash=hash_password("secret123"),
+        name="Т",
+        role=role,
+        status=status,
+    )
+    db_session.add(u)
+    db_session.commit()
+    return {
+        "access_token": create_access_token(u.id, u.role),
+        "id": u.id,
+        "role": u.role,
     }
 
 
@@ -53,25 +74,25 @@ def _org_admin_hdr(db_session):
 # superuser happy-path tests
 # ---------------------------------------------------------------------------
 
-def test_superuser_lists_users(client):
+def test_superuser_lists_users(client, db_session):
     """Первый зарегистрированный = superuser; может видеть всех пользователей."""
     superuser = make_user(client, "superuser@test.ru")
-    make_user(client, "second@test.ru")
+    make_user_db(db_session, "second@test.ru")
     resp = client.get("/api/admin/users", headers=auth(superuser))
     assert resp.status_code == 200
     assert len(resp.json()) == 2
 
 
-def test_non_admin_cannot_list_users(client):
+def test_non_admin_cannot_list_users(client, db_session):
     make_user(client, "superuser@test.ru")
-    second = make_user(client, "second@test.ru")
+    second = make_user_db(db_session, "second@test.ru")
     resp = client.get("/api/admin/users", headers=auth(second))
     assert resp.status_code == 403
 
 
-def test_superuser_approves_pending_user(client):
+def test_superuser_approves_pending_user(client, db_session):
     superuser = make_user(client, "superuser@test.ru")
-    make_user(client, "second@test.ru")
+    make_user_db(db_session, "second@test.ru")
     users = client.get("/api/admin/users", headers=auth(superuser)).json()
     pending_id = next(u["id"] for u in users if u["status"] == "pending")
     resp = client.post(
@@ -108,9 +129,9 @@ def test_superuser_cannot_block_self(client):
     assert resp.status_code == 400
 
 
-def test_superuser_blocks_other_user(client):
+def test_superuser_blocks_other_user(client, db_session):
     superuser = make_user(client, "superuser@test.ru")
-    make_user(client, "second@test.ru")
+    make_user_db(db_session, "second@test.ru")
     users = client.get("/api/admin/users", headers=auth(superuser)).json()
     other_id = next(u["id"] for u in users if u["email"] == "second@test.ru")
     resp = client.post(

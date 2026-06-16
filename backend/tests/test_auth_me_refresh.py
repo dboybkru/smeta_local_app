@@ -1,8 +1,9 @@
-from app.core.security import create_access_token, create_refresh_token
+from app.auth.models import User
+from app.core.security import create_access_token, create_refresh_token, hash_password
 
 
 def make_user(client, email="user@test.ru"):
-    """Регистрирует/логинит пользователя; возвращает dict с access_token/refresh_token для Bearer."""
+    """Регистрирует/логинит первого пользователя (bootstrap); возвращает dict с токенами."""
     resp = client.post(
         "/api/auth/register",
         json={"email": email, "password": "secret123", "name": "Т"},
@@ -20,6 +21,25 @@ def make_user(client, email="user@test.ru"):
         "refresh_token": create_refresh_token(user_id, role),
         "id": user_id,
         "role": role,
+    }
+
+
+def make_user_db(db_session, email, status="pending", role="estimator"):
+    """Создаёт пользователя напрямую в БД (регистрация закрыта после бутстрапа)."""
+    u = User(
+        email=email,
+        password_hash=hash_password("secret123"),
+        name="Т",
+        role=role,
+        status=status,
+    )
+    db_session.add(u)
+    db_session.commit()
+    return {
+        "access_token": create_access_token(u.id, u.role),
+        "refresh_token": create_refresh_token(u.id, u.role),
+        "id": u.id,
+        "role": u.role,
     }
 
 
@@ -58,9 +78,9 @@ def test_refresh_rejects_access_token(client):
     assert resp.status_code == 401
 
 
-def test_pending_user_can_see_me(client):
-    make_user(client, email="admin@test.ru")  # первый - админ
-    tokens = make_user(client, email="second@test.ru")  # pending
+def test_pending_user_can_see_me(client, db_session):
+    make_user(client, email="admin@test.ru")  # первый - админ (bootstrap)
+    tokens = make_user_db(db_session, "second@test.ru", status="pending")  # pending via DB
     resp = client.get("/api/auth/me", headers=auth(tokens))
     assert resp.status_code == 200
     assert resp.json()["status"] == "pending"
@@ -78,7 +98,7 @@ def block_user(db_session, email):
 
 def test_blocked_user_cannot_refresh(client, db_session):
     make_user(client, email="admin@test.ru")
-    tokens = make_user(client, email="bad@test.ru")
+    tokens = make_user_db(db_session, "bad@test.ru", status="active")
     block_user(db_session, "bad@test.ru")
     resp = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert resp.status_code == 401
@@ -86,7 +106,7 @@ def test_blocked_user_cannot_refresh(client, db_session):
 
 def test_blocked_user_cannot_login(client, db_session):
     make_user(client, email="admin@test.ru")
-    make_user(client, email="bad@test.ru")
+    make_user_db(db_session, "bad@test.ru", status="active")
     block_user(db_session, "bad@test.ru")
     resp = client.post(
         "/api/auth/login", json={"email": "bad@test.ru", "password": "secret123"}
@@ -106,10 +126,8 @@ def _set_pending(db_session, email):
 
 def test_pending_user_cannot_refresh(client, db_session):
     """pending-пользователь не должен получить новые токены через /refresh."""
-    make_user(client, email="admin@test.ru")  # первый → admin/active
-    tokens = make_user(client, email="pending@test.ru")  # второй → pending
-    # убеждаемся, что статус действительно pending
-    _set_pending(db_session, "pending@test.ru")
+    make_user(client, email="admin@test.ru")  # первый → admin/active (bootstrap)
+    tokens = make_user_db(db_session, "pending@test.ru", status="pending")  # pending via DB
     resp = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert resp.status_code == 401
 
@@ -149,11 +167,10 @@ def test_auth_config_yandex_enabled(client, monkeypatch):
 
 # --- /me returns org / superuser fields ---
 
-def test_me_returns_base_fields_no_org(client):
+def test_me_returns_base_fields_no_org(client, db_session):
     """/me возвращает is_superuser=false, org_id=null, org_name=null для обычного юзера без орга."""
-    make_user(client, email="first@test.ru")  # первый — суперюзер
-    tokens = make_user(client, email="noorg@test.ru")  # второй — обычный
-    # second user is pending by default; activate for test
+    make_user(client, email="first@test.ru")  # первый — суперюзер (bootstrap)
+    tokens = make_user_db(db_session, "noorg@test.ru", status="active")  # обычный — via DB
     resp = client.get("/api/auth/me", headers=auth(tokens))
     assert resp.status_code == 200
     data = resp.json()

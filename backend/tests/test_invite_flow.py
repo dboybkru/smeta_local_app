@@ -84,3 +84,28 @@ def test_resend_invite_404_for_non_invited(client, db_session, monkeypatch):
     db_session.add(active); db_session.commit()
     r = client.post(f"/api/orgs/{o.id}/users/{active.id}/resend-invite", headers=_h(su))
     assert r.status_code == 404
+
+
+def test_invite_info_and_accept(client, db_session, monkeypatch):
+    su, o = _su(db_session)
+    monkeypatch.setattr(email_sender, "send_invite_email", lambda *a, **k: None)
+    inv = client.post(f"/api/orgs/{o.id}/users", json={"email": "ac@x.ru", "role": "estimator"},
+                      headers=_h(su)).json()
+    token = inv["invite_link"].rsplit("/invite/", 1)[1]
+    info = client.get(f"/api/auth/invite/{token}")
+    assert info.status_code == 200 and info.json()["email"] == "ac@x.ru"
+    acc = client.post(f"/api/auth/invite/{token}/accept",
+                      json={"name": "Acme", "password": "Pass12345"})
+    assert acc.status_code == 200 and acc.json()["status"] == "active"
+    u = db_session.scalars(sqlalchemy.select(User).where(User.email == "ac@x.ru")).one()
+    assert u.status == "active" and u.invite_token is None and u.password_hash
+    # повторный accept → 404 (токен погашен)
+    assert client.post(f"/api/auth/invite/{token}/accept",
+                       json={"name": "X", "password": "Pass12345"}).status_code == 404
+
+
+def test_register_invite_only_when_users_exist(client, db_session):
+    _su(db_session)  # юзеры уже есть
+    r = client.post("/api/auth/register",
+                    json={"email": "open@x.ru", "password": "Pass12345", "name": "O"})
+    assert r.status_code == 403
