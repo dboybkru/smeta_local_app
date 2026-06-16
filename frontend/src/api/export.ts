@@ -1,14 +1,13 @@
-import { ApiError, getTokens, tryRefresh } from "./client";
+import { ApiError, tryRefresh } from "./client";
 
 export type ExportFormat = "xlsx" | "pdf";
 export type ExportLevel = "full" | "cover" | "estimate";
 
+// Бинарное скачивание через cookie-сессию — credentials: "same-origin" достаточно.
 function authedFetch(url: string) {
-  const { access } = getTokens();
-  return fetch(url, { headers: access ? { Authorization: `Bearer ${access}` } : {} });
+  return fetch(url, { credentials: "same-origin" });
 }
 
-// Бинарное скачивание: нужен заголовок Authorization, поэтому не api() (тот делает .json()).
 export async function downloadExport(
   estimateId: number,
   fmt: ExportFormat,

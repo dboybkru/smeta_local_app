@@ -32,7 +32,7 @@ function stubOrgAdmin(orgId: number | null = ORG_ID) {
       org_name: orgId != null ? "Акме" : null,
     },
     loginWithPassword: vi.fn(),
-    acceptTokens: vi.fn(),
+    reload: vi.fn(),
     logout: vi.fn(),
   });
 }

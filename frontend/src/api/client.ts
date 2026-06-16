@@ -1,56 +1,36 @@
 const BASE = "/api";
 
-export function getTokens() {
-  return {
-    access: localStorage.getItem("access_token"),
-    refresh: localStorage.getItem("refresh_token"),
-  };
+export function getCsrf(): string | null {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
-// TODO(security): перед публичным запуском рассмотреть httpOnly-cookie вместо localStorage
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem("access_token", access);
-  localStorage.setItem("refresh_token", refresh);
-}
-
-export function clearTokens() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-}
+const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 async function rawRequest(path: string, options: RequestInit = {}) {
-  const { access } = getTokens();
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   // Browser must set the multipart boundary itself — never force Content-Type for FormData.
   if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-  if (access) headers["Authorization"] = `Bearer ${access}`;
-  return fetch(`${BASE}${path}`, { ...options, headers });
+  const method = (options.method ?? "GET").toUpperCase();
+  if (UNSAFE.has(method)) {
+    const csrf = getCsrf();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
+  return fetch(`${BASE}${path}`, { ...options, headers, credentials: "same-origin" });
 }
 
 // Shared in-flight refresh promise: N concurrent 401s trigger exactly ONE /auth/refresh call.
 let refreshing: Promise<boolean> | null = null;
 
 async function doRefresh(): Promise<boolean> {
-  const { refresh } = getTokens();
-  if (!refresh) return false;
   const resp = await fetch(`${BASE}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refresh }),
+    credentials: "same-origin",
   });
-  if (!resp.ok) {
-    clearTokens();
-    return false;
-  }
-  const body = await resp.json().catch(() => null);
-  if (!body?.access_token || !body?.refresh_token) {
-    clearTokens();
-    return false;
-  }
-  setTokens(body.access_token, body.refresh_token);
-  return true;
+  return resp.ok;
 }
 
 export async function tryRefresh(): Promise<boolean> {

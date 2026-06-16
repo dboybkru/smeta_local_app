@@ -25,7 +25,7 @@ function stubSuperuser() {
       org_name: null,
     },
     loginWithPassword: vi.fn(),
-    acceptTokens: vi.fn(),
+    reload: vi.fn(),
     logout: vi.fn(),
   });
 }
@@ -43,7 +43,7 @@ function stubNonSuperuser() {
       org_name: "Акме",
     },
     loginWithPassword: vi.fn(),
-    acceptTokens: vi.fn(),
+    reload: vi.fn(),
     logout: vi.fn(),
   });
 }

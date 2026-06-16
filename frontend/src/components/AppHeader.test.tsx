@@ -18,7 +18,7 @@ function stubUser(role: string, extra: Partial<authModule.User> = {}) {
       ...extra,
     },
     loginWithPassword: vi.fn(),
-    acceptTokens: vi.fn(),
+    reload: vi.fn(),
     logout: vi.fn(),
   });
 }
