@@ -132,11 +132,8 @@ def yandex_callback(code: str, state: str, request: Request, db: Session = Depen
     user = service.get_or_create_yandex_user(db, info)
     if user.status == "blocked":
         raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
-    pair = service.issue_tokens(user)
-    url = (
-        f"{settings.frontend_url}/auth/callback"
-        f"#access_token={pair['access_token']}&refresh_token={pair['refresh_token']}"
-    )
-    resp = RedirectResponse(url)
+    t = service.issue_tokens(user)
+    resp = RedirectResponse(f"{settings.frontend_url}/auth/callback")
+    set_auth_cookies(resp, t["access_token"], t["refresh_token"])
     resp.delete_cookie("yx_state")
     return resp

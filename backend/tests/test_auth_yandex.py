@@ -38,17 +38,46 @@ def test_yandex_callback_creates_user_and_redirects(client):
     resp = client.get(
         f"/api/auth/yandex/callback?code=abc&state={state}", follow_redirects=False
     )
-    assert resp.status_code == 307
-    assert "#access_token=" in resp.headers["location"]
+    assert resp.status_code in (302, 307)
+    location = resp.headers["location"]
+    assert "/auth/callback" in location
+    assert "#" not in location
+    assert "access_token" in resp.cookies
 
     # первый пользователь -> активный админ
-    import urllib.parse
-
-    fragment = urllib.parse.urlparse(resp.headers["location"]).fragment
-    access = dict(p.split("=", 1) for p in fragment.split("&"))["access_token"]
-    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {access}"})
+    me = client.get("/api/auth/me")
     assert me.json()["email"] == "ya@yandex.ru"
     assert me.json()["role"] == "org_admin"
+
+
+@respx.mock
+def test_yandex_callback_sets_cookies_no_fragment(client):
+    """Callback ставит cookie с токеном и редиректит БЕЗ fragment (#)."""
+    respx.post("https://oauth.yandex.ru/token").mock(
+        return_value=Response(200, json={"access_token": "ya-token"})
+    )
+    respx.get("https://login.yandex.ru/info").mock(
+        return_value=Response(
+            200,
+            json={"id": "yx-456", "default_email": "cookie@yandex.ru", "real_name": "Куки Тест"},
+        )
+    )
+    login = client.get("/api/auth/yandex/login", follow_redirects=False)
+    state = login.cookies["yx_state"]
+    client.cookies.set("yx_state", state)
+
+    resp = client.get(
+        f"/api/auth/yandex/callback?code=xyz&state={state}", follow_redirects=False
+    )
+
+    # редирект без фрагмента
+    assert resp.status_code in (302, 307)
+    location = resp.headers["location"]
+    assert "/auth/callback" in location
+    assert "#" not in location
+
+    # access_token должен прийти в Set-Cookie
+    assert "access_token" in resp.cookies
 
 
 def test_yandex_callback_bad_state_400(client):
