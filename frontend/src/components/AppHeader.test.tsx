@@ -32,24 +32,60 @@ describe("AppHeader", () => {
     expect(screen.getByText("Каталог")).toBeInTheDocument();
   });
 
-  it("hides admin-only links from non-admins", () => {
+  it("hides org-admin links from estimator", () => {
     stubUser("estimator");
     render(<MemoryRouter><AppHeader /></MemoryRouter>);
     expect(screen.queryByText("Импорт")).not.toBeInTheDocument();
     expect(screen.queryByText("Уровни цен")).not.toBeInTheDocument();
+    expect(screen.queryByText("Поставщики")).not.toBeInTheDocument();
+    expect(screen.queryByText("Пользователи")).not.toBeInTheDocument();
     expect(screen.queryByText("AI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Организации")).not.toBeInTheDocument();
   });
 
-  it("shows admin-only links to admins", () => {
-    stubUser("admin");
+  it("shows org-level admin links to org_admin (not superuser)", () => {
+    stubUser("org_admin");
     render(<MemoryRouter><AppHeader /></MemoryRouter>);
     expect(screen.getByText("Импорт")).toBeInTheDocument();
     expect(screen.getByText("Уровни цен")).toBeInTheDocument();
+    expect(screen.getByText("Поставщики")).toBeInTheDocument();
     expect(screen.getByText("Пользователи")).toBeInTheDocument();
-    expect(screen.getByText("AI")).toBeInTheDocument();
   });
 
-  it("shows Реквизиты to estimator/admin but hides from viewer", () => {
+  it("hides AI and Организации from org_admin (not superuser)", () => {
+    stubUser("org_admin");
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.queryByText("AI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Организации")).not.toBeInTheDocument();
+  });
+
+  it("shows AI and Организации only to superuser", () => {
+    stubUser("org_admin", { is_superuser: true });
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.getByText("AI")).toBeInTheDocument();
+    expect(screen.getByText("Организации")).toBeInTheDocument();
+  });
+
+  it("shows all org-level links to superuser too", () => {
+    stubUser("org_admin", { is_superuser: true });
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.getByText("Импорт")).toBeInTheDocument();
+    expect(screen.getByText("Уровни цен")).toBeInTheDocument();
+    expect(screen.getByText("Поставщики")).toBeInTheDocument();
+    expect(screen.getByText("Пользователи")).toBeInTheDocument();
+  });
+
+  it("hides admin-only links from viewer", () => {
+    stubUser("viewer");
+    render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.queryByText("Импорт")).not.toBeInTheDocument();
+    expect(screen.queryByText("Уровни цен")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI")).not.toBeInTheDocument();
+    expect(screen.queryByText("Пользователи")).not.toBeInTheDocument();
+    expect(screen.queryByText("Организации")).not.toBeInTheDocument();
+  });
+
+  it("shows Реквизиты to estimator but hides from viewer", () => {
     stubUser("estimator");
     const { unmount } = render(<MemoryRouter><AppHeader /></MemoryRouter>);
     expect(screen.getByText("Реквизиты")).toBeInTheDocument();
@@ -61,7 +97,7 @@ describe("AppHeader", () => {
   });
 
   it("hides «Организации» link from non-superusers", () => {
-    stubUser("admin");
+    stubUser("org_admin");
     render(<MemoryRouter><AppHeader /></MemoryRouter>);
     expect(screen.queryByText("Организации")).not.toBeInTheDocument();
   });

@@ -5,13 +5,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_admin
+from app.auth.deps import require_superuser
 from app.auth.models import User
 from app.auth.schemas import UserOut
 from app.core.db import get_db
 
 router = APIRouter(
-    prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)]
+    prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_superuser)]
 )
 
 
@@ -29,17 +29,15 @@ def set_status(
     user_id: int,
     body: StatusIn,
     db: Session = Depends(get_db),
-    # require_admin выполняется и на уровне роутера, и здесь (FastAPI кэширует
+    # require_superuser выполняется и на уровне роутера, и здесь (FastAPI кэширует
     # по identity Depends-объекта, так что это второй прогон цепочки — осознанно:
-    # нам нужен сам объект admin, get_db при этом общий). Накладные расходы малы.
-    admin: User = Depends(require_admin),
+    # нам нужен сам объект superuser). Накладные расходы малы.
+    superuser: User = Depends(require_superuser),
 ):
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
-    # Блокировка другого админа НЕ запрещена — осознанный пробел v1
-    # (оператор один). Если админов станет больше — добавить guard.
-    if user.id == admin.id and body.status == "blocked":
+    if user.id == superuser.id and body.status == "blocked":
         raise HTTPException(status_code=400, detail="Нельзя заблокировать самого себя")
     user.status = body.status
     db.commit()
