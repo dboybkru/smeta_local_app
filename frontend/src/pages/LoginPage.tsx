@@ -81,6 +81,9 @@ export default function LoginPage() {
             Войти
           </button>
         </form>
+        <p className="text-center text-sm text-stone-400">
+          Нет аккаунта? Попросите приглашение у администратора.
+        </p>
       </div>
     </div>
   );
