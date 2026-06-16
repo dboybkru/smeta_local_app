@@ -7,6 +7,9 @@ export type User = {
   name: string;
   role: string;
   status: string;
+  is_superuser: boolean;
+  org_id: number | null;
+  org_name: string | null;
 };
 
 type AuthState = {

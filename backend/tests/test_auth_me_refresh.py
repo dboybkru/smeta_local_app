@@ -129,3 +129,55 @@ def test_auth_config_yandex_enabled(client, monkeypatch):
     resp = client.get("/api/auth/config")
     assert resp.status_code == 200
     assert resp.json() == {"yandex_enabled": True}
+
+
+# --- /me returns org / superuser fields ---
+
+def test_me_returns_base_fields_no_org(client):
+    """/me возвращает is_superuser=false, org_id=null, org_name=null для обычного юзера без орга."""
+    make_user(client, email="first@test.ru")  # первый — суперюзер
+    tokens = make_user(client, email="noorg@test.ru")  # второй — обычный
+    # second user is pending by default; activate for test
+    resp = client.get("/api/auth/me", headers=auth(tokens))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_superuser"] is False
+    assert data["org_id"] is None
+    assert data["org_name"] is None
+
+
+def test_me_returns_org_name_for_org_user(client, db_session):
+    """/me возвращает org_id и org_name когда пользователь принадлежит организации."""
+    from tests.orghelpers import get_or_create_org
+
+    org = get_or_create_org(db_session)
+    tokens = make_user(client, email="orguser@test.ru")
+
+    # Assign user to org in DB
+    from sqlalchemy import select
+    from app.auth.models import User as UserModel
+
+    user = db_session.scalar(select(UserModel).where(UserModel.email == "orguser@test.ru"))
+    user.org_id = org.id
+    db_session.commit()
+
+    resp = client.get("/api/auth/me", headers=auth(tokens))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["org_id"] == org.id
+    assert data["org_name"] == org.name
+
+
+def test_me_superuser_flag(client, db_session):
+    """/me возвращает is_superuser=true для суперюзера."""
+    from sqlalchemy import select
+    from app.auth.models import User as UserModel
+
+    tokens = make_user(client, email="super@test.ru")
+    user = db_session.scalar(select(UserModel).where(UserModel.email == "super@test.ru"))
+    user.is_superuser = True
+    db_session.commit()
+
+    resp = client.get("/api/auth/me", headers=auth(tokens))
+    assert resp.status_code == 200
+    assert resp.json()["is_superuser"] is True

@@ -12,6 +12,7 @@ from app.auth.schemas import LoginIn, RefreshIn, RegisterIn, TokenPair, UserOut
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import InvalidTokenError, decode_token
+from app.orgs.models import Organization
 from app.settings import service as settings_service
 from app.settings.router import YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET
 
@@ -45,8 +46,22 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
-    return user
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    org_name: str | None = None
+    if user.org_id is not None:
+        org = db.get(Organization, user.org_id)
+        if org is not None:
+            org_name = org.name
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        status=user.status,
+        is_superuser=user.is_superuser,
+        org_id=user.org_id,
+        org_name=org_name,
+    )
 
 
 @router.post("/refresh", response_model=TokenPair)

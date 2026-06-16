@@ -14,7 +14,7 @@ const EMPTY = { id: 0, org_name: "", inn: "", contacts: { phone: "", email: "", 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function stub() {
   vi.spyOn(authModule, "useAuth").mockReturnValue({
-    user: { id: 1, email: "a@b.c", name: "A", role: "estimator", status: "active" },
+    user: { id: 1, email: "a@b.c", name: "A", role: "estimator", status: "active", is_superuser: false, org_id: null, org_name: null },
     loginWithPassword: vi.fn(), acceptTokens: vi.fn(), logout: vi.fn(),
   });
 }
