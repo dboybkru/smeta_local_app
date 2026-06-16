@@ -108,6 +108,28 @@ def _org_admin(db, name):
     db.add(u); db.commit(); return o, u
 
 
+def test_start_endpoint_cross_org_dedup_isolation(client, db_session):
+    """Org B не должна получить активную задачу org A — должна создать свою."""
+    oa, ua = _org_admin(db_session, "ExtA"); ob, ub = _org_admin(db_session, "ExtB")
+    # Создаём активную задачу org A напрямую в БД
+    job_a = Job(
+        type="catalog_extract", status="running", org_id=oa.id,
+        params={"supplier_id": None, "org_id": oa.id},
+    )
+    db_session.add(job_a); db_session.commit()
+
+    # Org B вызывает /start — должна получить собственную новую задачу
+    r = client.post("/api/catalog/extract-characteristics/start", headers=_hdr(ub))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["id"] != job_a.id, "org B не должна получать задачу org A"
+    assert body["status"] == "pending"
+    # Убеждаемся, что созданная задача принадлежит org B
+    new_job = db_session.get(Job, body["id"])
+    assert new_job is not None
+    assert new_job.org_id == ob.id, "новая задача должна принадлежать org B"
+
+
 def test_job_not_visible_across_orgs(client, db_session):
     oa, ua = _org_admin(db_session, "JA"); ob, ub = _org_admin(db_session, "JB")
     job = Job(type="catalog_extract", status="done", org_id=oa.id,
