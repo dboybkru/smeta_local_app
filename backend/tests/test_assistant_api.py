@@ -1,26 +1,15 @@
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from app.ai import service as ai_service
 from app.auth.models import User
 from app.catalog.models import CatalogItem, Supplier
 from app.core.security import create_access_token
 from app.estimates import models as em
-from app.orgs.models import Organization
+from tests.orghelpers import get_or_create_org as _get_org
 
 
 def _hdr(u):
     return {"Authorization": f"Bearer {create_access_token(u.id, u.role)}"}
-
-
-def _get_org(db_session):
-    org = db_session.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db_session.add(org)
-        db_session.commit()
-    return org
 
 
 def _setup(db_session, role="estimator"):

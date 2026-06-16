@@ -1,20 +1,10 @@
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
-from app.orgs.models import Organization
-
-
-def _get_or_create_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
+from tests.orghelpers import get_or_create_org as _get_or_create_org
 
 
 def test_catalog_models_roundtrip(db_session):

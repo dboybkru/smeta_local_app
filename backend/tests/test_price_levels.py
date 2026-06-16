@@ -1,26 +1,24 @@
 from sqlalchemy import select
 
 from app.auth.models import User
-from app.core.security import create_access_token
 from app.orgs.models import Organization
 
 
-def make_admin(client, db=None):
-    """Register+login the first (superuser) user. If db is supplied, also creates an
-    Organization and assigns org_id to the user so current_org() works in catalog endpoints."""
+def make_admin(client, db):
+    """Register+login the first (superuser) user, also creates an Organization and
+    assigns org_id to the user so current_org() works in catalog endpoints."""
     resp = client.post(
         "/api/auth/register",
         json={"email": "admin@test.ru", "password": "secret123", "name": "А"},
     )
     assert resp.status_code == 201
-    if db is not None:
-        user = db.scalars(select(User).where(User.email == "admin@test.ru")).one()
-        if user.org_id is None:
-            org = Organization(name="TestAdminOrg")
-            db.add(org)
-            db.commit()
-            user.org_id = org.id
-            db.commit()
+    user = db.scalars(select(User).where(User.email == "admin@test.ru")).one()
+    if user.org_id is None:
+        org = Organization(name="TestAdminOrg")
+        db.add(org)
+        db.commit()
+        user.org_id = org.id
+        db.commit()
     resp = client.post(
         "/api/auth/login", json={"email": "admin@test.ru", "password": "secret123"}
     )

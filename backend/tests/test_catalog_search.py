@@ -3,19 +3,9 @@ import json
 from app.catalog import search
 from app.catalog.models import CatalogItem, Supplier
 from app.catalog.service import search_items
-from app.orgs.models import Organization
 from tests.catalog_files import make_bolid_xlsx
+from tests.orghelpers import get_or_create_org as _get_or_create_org
 from tests.test_price_levels import make_admin
-
-
-def _get_or_create_org(db):
-    from sqlalchemy import select
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
 
 
 def _mk_item(db, name):

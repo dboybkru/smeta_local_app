@@ -1,17 +1,6 @@
-from sqlalchemy import select
-
 from app.auth.models import User
 from app.core.security import create_access_token
-from app.orgs.models import Organization
-
-
-def _get_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
+from tests.orghelpers import get_or_create_org as _get_org
 
 
 def _u(db, role="estimator"):
