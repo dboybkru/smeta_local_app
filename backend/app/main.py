@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from app.ai.router import router as ai_router
 from app.assistant.router import router as assistant_router
@@ -18,6 +20,16 @@ from app.publiclinks.public_router import router as public_page_router
 from app.publiclinks.router import router as publiclinks_router
 from app.settings.router import router as settings_router
 
+_CSRF_EXEMPT = {
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/refresh",
+    "/api/auth/yandex/login",
+    "/api/auth/yandex/callback",
+}
+
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +39,26 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SmetaApp API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def csrf_protect(request: Request, call_next):
+    if (
+        request.method in _UNSAFE_METHODS
+        and request.url.path.startswith("/api/")
+        and request.url.path not in _CSRF_EXEMPT
+        and request.cookies.get("access_token")  # только cookie-аутентификация
+    ):
+        cookie_csrf = request.cookies.get("csrf_token")
+        header_csrf = request.headers.get("X-CSRF-Token")
+        if not cookie_csrf or not header_csrf or cookie_csrf != header_csrf:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "CSRF-токен отсутствует или недействителен"},
+            )
+    return await call_next(request)
+
+
 app.include_router(orgs_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
