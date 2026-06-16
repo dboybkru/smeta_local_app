@@ -1,7 +1,5 @@
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from app.auth.models import User
 from app.estimates.models import (
     Estimate,
@@ -9,16 +7,7 @@ from app.estimates.models import (
     EstimateLine,
     EstimateSection,
 )
-from app.orgs.models import Organization
-
-
-def _get_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
+from tests.orghelpers import get_or_create_org as _get_org
 
 
 def _owner(db):

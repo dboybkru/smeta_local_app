@@ -76,7 +76,7 @@ def test_price_levels_isolated(client, db_session):
     r = client.post("/api/price-levels", json={"name": "Секретный уровень"}, headers=_hdr(ua))
     assert r.status_code == 201, r.text
     levels_b = client.get("/api/price-levels", headers=_hdr(ub)).json()
-    assert all(l["name"] != "Секретный уровень" for l in levels_b)
+    assert all(lvl["name"] != "Секретный уровень" for lvl in levels_b)
 
 
 def test_duplicate_price_level_same_org_409(client, db_session):

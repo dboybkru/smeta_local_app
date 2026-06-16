@@ -6,8 +6,8 @@ from app.catalog import detect
 from app.catalog.importer import import_parsed, parse_rows
 from app.catalog.models import CatalogItem, PriceLevel, Supplier
 from app.catalog.schemas import ColumnMapping
-from app.orgs.models import Organization
 from tests.fixtures import pricelists as P
+from tests.orghelpers import get_or_create_org as _get_or_create_org
 
 
 def _mapping_from_layout(layout, level_ids):
@@ -22,15 +22,6 @@ def _mapping_from_layout(layout, level_ids):
         data_start_row=layout.data_start_row, price_cols=price_cols,
         on_request_cols=on_req,
     )
-
-
-def _get_or_create_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
 
 
 def _setup(db, n_levels=3):

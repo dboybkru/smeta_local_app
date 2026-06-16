@@ -1,20 +1,9 @@
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from app.catalog.models import CatalogItem, ItemPrice, PriceLevel, PriceList, Supplier
 from app.estimates.models import Client
 from app.estimates.service import snapshot_line_values
-from app.orgs.models import Organization
-
-
-def _get_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
+from tests.orghelpers import get_or_create_org as _get_org
 
 
 def _catalog(db, kind="material", prices=None):

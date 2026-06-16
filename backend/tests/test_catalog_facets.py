@@ -1,19 +1,8 @@
-from sqlalchemy import select
-
 from app.auth.models import User
 from app.catalog.models import CatalogItem, Supplier
 from app.catalog.service import search_items
 from app.core.security import create_access_token
-from app.orgs.models import Organization
-
-
-def _get_or_create_org(db):
-    org = db.scalars(select(Organization).limit(1)).first()
-    if org is None:
-        org = Organization(name="TestOrg")
-        db.add(org)
-        db.commit()
-    return org
+from tests.orghelpers import get_or_create_org as _get_or_create_org
 
 
 def _hdr(u):
@@ -37,7 +26,7 @@ def _items(db):
 
 
 def test_search_items_facet_filter(db_session):
-    sup = _items(db_session)
+    _items(db_session)
     org = _get_or_create_org(db_session)
     items, total = search_items(db_session, facets={"Разрешение": "2 Мп"}, org_id=org.id)
     assert total == 1 and items[0].name == "Камера A"
