@@ -413,7 +413,11 @@ def start_extract_characteristics(
     есть — возвращает её (без дублирования расхода). force=true — сбросить уже
     извлечённые характеристики (в т.ч. пустые {}) и переизвлечь заново."""
     active = db.scalars(
-        select(Job).where(Job.type == "catalog_extract", Job.status.in_(("pending", "running")))
+        select(Job).where(
+            Job.type == "catalog_extract",
+            Job.status.in_(("pending", "running")),
+            Job.org_id == org,
+        )
     ).first()
     if active is not None:
         return active
