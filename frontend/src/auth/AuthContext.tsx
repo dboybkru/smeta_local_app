@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, clearTokens, getTokens, setTokens } from "../api/client";
+import { api } from "../api/client";
 
 export type User = {
   id: number;
@@ -15,8 +15,8 @@ export type User = {
 type AuthState = {
   user: User | null | undefined; // undefined = загрузка
   loginWithPassword: (email: string, password: string) => Promise<void>;
-  acceptTokens: (access: string, refresh: string) => Promise<void>;
-  logout: () => void;
+  reload: () => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthCtx = createContext<AuthState | null>(null);
@@ -28,37 +28,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setUser(await api<User>("/auth/me"));
     } catch {
-      clearTokens();
       setUser(null);
     }
   }
 
   useEffect(() => {
-    if (getTokens().access) void loadMe();
-    else setUser(null);
+    void loadMe();
   }, []);
 
   async function loginWithPassword(email: string, password: string) {
-    const pair = await api<{ access_token: string; refresh_token: string }>("/auth/login", {
+    setUser(await api<User>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-    });
-    setTokens(pair.access_token, pair.refresh_token);
+    }));
+  }
+
+  async function reload() {
     await loadMe();
   }
 
-  async function acceptTokens(access: string, refresh: string) {
-    setTokens(access, refresh);
-    await loadMe();
-  }
-
-  function logout() {
-    clearTokens();
+  async function logout() {
+    try {
+      await api("/auth/logout", { method: "POST" });
+    } catch {
+      // ignore errors — clear local state anyway
+    }
     setUser(null);
   }
 
   return (
-    <AuthCtx.Provider value={{ user, loginWithPassword, acceptTokens, logout }}>
+    <AuthCtx.Provider value={{ user, loginWithPassword, reload, logout }}>
       {children}
     </AuthCtx.Provider>
   );

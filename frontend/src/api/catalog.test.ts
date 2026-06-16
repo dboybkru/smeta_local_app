@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deletePriceLevel,
   importFile,
@@ -13,10 +13,6 @@ function mockFetchOnce(data: unknown, status = 200) {
     new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } })
   );
 }
-
-beforeEach(() => {
-  localStorage.setItem("access_token", "t");
-});
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   listOrgs,
   createOrg,
@@ -16,10 +16,6 @@ function mockFetchOnce(data: unknown, status = 200) {
     })
   );
 }
-
-beforeEach(() => {
-  localStorage.setItem("access_token", "t");
-});
 
 afterEach(() => vi.restoreAllMocks());
 

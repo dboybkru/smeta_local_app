@@ -21,7 +21,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function stubUser(role = "estimator") {
   vi.spyOn(authModule, "useAuth").mockReturnValue({
     user: { id: 1, email: "a@b.c", name: "A", role, status: "active", is_superuser: false, org_id: null, org_name: null },
-    loginWithPassword: vi.fn(), acceptTokens: vi.fn(), logout: vi.fn(),
+    loginWithPassword: vi.fn(), reload: vi.fn(), logout: vi.fn(),
   });
 }
 
