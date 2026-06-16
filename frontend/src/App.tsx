@@ -9,6 +9,7 @@ import EstimatesListPage from "./pages/EstimatesListPage";
 import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
 import LoginPage from "./pages/LoginPage";
+import InvitePage from "./pages/InvitePage";
 import OrgsPage from "./pages/OrgsPage";
 import PriceLevelsPage from "./pages/PriceLevelsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -20,6 +21,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/invite/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/catalog" element={<CatalogPage />} />

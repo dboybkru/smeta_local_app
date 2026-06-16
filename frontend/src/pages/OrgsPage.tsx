@@ -6,10 +6,12 @@ import {
   createOrg,
   listOrgUsers,
   inviteUser,
+  resendInvite,
   updateOrgUser,
   type Org,
   type OrgUser,
   type OrgRole,
+  type InviteResult,
 } from "../api/orgs";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -145,6 +147,7 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
   const [inviteRole, setInviteRole] = useState<OrgRole>("estimator");
   const [inviting, setInviting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [lastInvite, setLastInvite] = useState<InviteResult | null>(null);
 
   async function load() {
     try {
@@ -158,6 +161,7 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
   useEffect(() => {
     setUsers([]);
     setError("");
+    setLastInvite(null);
     void load();
   }, [org.id]);
 
@@ -165,8 +169,10 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
     if (!inviteEmail.trim()) return;
     setInviting(true);
     setError("");
+    setLastInvite(null);
     try {
-      await inviteUser(org.id, { email: inviteEmail.trim(), role: inviteRole });
+      const result = await inviteUser(org.id, { email: inviteEmail.trim(), role: inviteRole });
+      setLastInvite(result);
       setInviteEmail("");
       await load();
       onChanged();
@@ -174,6 +180,21 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
       setError(e instanceof Error ? e.message : "Ошибка приглашения");
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleResend(uid: number) {
+    setBusyId(uid);
+    setError("");
+    setLastInvite(null);
+    try {
+      const result = await resendInvite(org.id, uid);
+      setLastInvite(result);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка переотправки");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -245,6 +266,32 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
         </button>
       </div>
 
+      {/* Invite result */}
+      {lastInvite && (
+        <div className="mb-4 rounded border border-stone-200 bg-stone-50 p-3 text-sm">
+          {lastInvite.email_sent ? (
+            <p className="text-green-700">Письмо с приглашением отправлено на {lastInvite.email}.</p>
+          ) : (
+            <>
+              <p className="mb-1 text-stone-600">
+                Письмо не отправлено (SMTP не настроен). Передайте ссылку вручную:
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 break-all rounded border border-stone-300 bg-white px-2 py-1 text-xs">
+                  {lastInvite.invite_link}
+                </code>
+                <button
+                  onClick={() => void navigator.clipboard.writeText(lastInvite.invite_link)}
+                  className="shrink-0 rounded border border-stone-500 px-2 py-1 text-xs text-stone-600"
+                >
+                  Копировать
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Users table */}
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -295,7 +342,16 @@ function OrgUsersPanel({ org, onChanged }: { org: Org; onChanged: () => void }) 
                 </span>
               </td>
               <td className="space-x-2 text-right">
-                {u.status !== "blocked" && (
+                {u.status === "invited" && (
+                  <button
+                    onClick={() => void handleResend(u.id)}
+                    disabled={busyId === u.id}
+                    className="rounded border border-stone-500 px-2 py-1 text-xs text-stone-600 disabled:opacity-50"
+                  >
+                    Переотправить
+                  </button>
+                )}
+                {u.status !== "blocked" && u.status !== "invited" && (
                   <button
                     onClick={() => void handleStatusToggle(u.id, u.status)}
                     disabled={busyId === u.id}

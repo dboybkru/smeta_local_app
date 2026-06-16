@@ -4,7 +4,7 @@ import ProvidersSection from "../components/ai/ProvidersSection";
 import ModelsSection from "../components/ai/ModelsSection";
 import PurposesSection from "../components/ai/PurposesSection";
 import UsageSection from "../components/ai/UsageSection";
-import { getDadataSettings, saveDadata, getYandex, setYandex } from "../api/settings";
+import { getDadataSettings, saveDadata, getYandex, setYandex, getSmtp, setSmtp } from "../api/settings";
 
 export default function AiConfigPage() {
   const [version, setVersion] = useState(0);
@@ -20,6 +20,7 @@ export default function AiConfigPage() {
         <UsageSection version={version} onChanged={bump} />
         <DadataSettings />
         <YandexSettings />
+        <SmtpSettings />
       </main>
     </div>
   );
@@ -66,6 +67,114 @@ function YandexSettings() {
           className="rounded border border-stone-300 px-2 py-1 text-sm"
         />
         <button onClick={() => void save()} className="rounded border border-stone-700 px-3 py-1 text-sm text-stone-700">Сохранить</button>
+        {msg && <span className="text-sm text-stone-500">{msg}</span>}
+      </div>
+    </section>
+  );
+}
+
+function SmtpSettings() {
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("");
+  const [user, setUser] = useState("");
+  const [fromAddr, setFromAddr] = useState("");
+  const [tls, setTls] = useState("true");
+  const [password, setPassword] = useState("");
+  const [hasPassword, setHasPassword] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    void getSmtp()
+      .then((s) => {
+        setHost(s.host ?? "");
+        setPort(s.port ?? "");
+        setUser(s.user ?? "");
+        setFromAddr(s.from_addr ?? "");
+        setTls(s.tls ?? "true");
+        setHasPassword(s.has_password);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function save() {
+    try {
+      const s = await setSmtp({ host, port, user, password, from_addr: fromAddr, tls });
+      setHost(s.host ?? "");
+      setPort(s.port ?? "");
+      setUser(s.user ?? "");
+      setFromAddr(s.from_addr ?? "");
+      setTls(s.tls ?? "true");
+      setHasPassword(s.has_password);
+      setPassword("");
+      setMsg("Сохранено");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Ошибка");
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <h2 className="mb-2 font-serif text-lg text-stone-900">SMTP (отправка почты)</h2>
+      <p className="mb-2 text-sm text-stone-500">
+        Используется для отправки писем-приглашений. Пароль — {hasPassword ? "задан ✓" : "не задан"}.
+        Пустое поле пароля не меняет сохранённое значение.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <input
+          type="text"
+          aria-label="SMTP хост"
+          value={host}
+          onChange={(e) => setHost(e.target.value)}
+          placeholder="smtp.example.com"
+          className="rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+        <input
+          type="text"
+          aria-label="SMTP порт"
+          value={port}
+          onChange={(e) => setPort(e.target.value)}
+          placeholder="587"
+          className="w-20 rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+        <input
+          type="text"
+          aria-label="SMTP пользователь"
+          value={user}
+          onChange={(e) => setUser(e.target.value)}
+          placeholder="user@example.com"
+          className="rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+        <input
+          type="password"
+          aria-label="SMTP пароль"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Пароль (оставьте пустым, чтобы не менять)"
+          className="rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+        <input
+          type="text"
+          aria-label="SMTP адрес отправителя"
+          value={fromAddr}
+          onChange={(e) => setFromAddr(e.target.value)}
+          placeholder="noreply@example.com"
+          className="rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+        <select
+          aria-label="SMTP TLS"
+          value={tls}
+          onChange={(e) => setTls(e.target.value)}
+          className="rounded border border-stone-300 px-2 py-1 text-sm"
+        >
+          <option value="true">STARTTLS включён</option>
+          <option value="false">STARTTLS выключен</option>
+        </select>
+        <button
+          onClick={() => void save()}
+          className="rounded border border-stone-700 px-3 py-1 text-sm text-stone-700"
+        >
+          Сохранить
+        </button>
         {msg && <span className="text-sm text-stone-500">{msg}</span>}
       </div>
     </section>

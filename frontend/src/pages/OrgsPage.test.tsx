@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import * as authModule from "../auth/AuthContext";
+import * as orgsApi from "../api/orgs";
 import OrgsPage from "./OrgsPage";
 
 function json(data: unknown, status = 200) {
@@ -124,6 +125,107 @@ describe("OrgsPage", () => {
         (c) => ((c[1] as RequestInit)?.method ?? "GET") === "POST"
       );
       expect(postCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("показывает ссылку-инвайт если email_sent=false", async () => {
+    stubSuperuser();
+    const org = { id: 1, name: "Акме", user_count: 0 };
+    const inviteResult = {
+      id: 10,
+      email: "new@test.ru",
+      role: "estimator",
+      status: "invited",
+      email_sent: false,
+      invite_link: "https://smetaapp.ru/invite/abc123",
+    };
+    vi.spyOn(orgsApi, "inviteUser").mockResolvedValue(inviteResult);
+    vi.spyOn(orgsApi, "listOrgs").mockResolvedValue([org]);
+    vi.spyOn(orgsApi, "listOrgUsers").mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <OrgsPage />
+      </MemoryRouter>
+    );
+
+    await screen.findByText("Акме");
+    await userEvent.click(screen.getByText("Акме"));
+
+    const emailInput = await screen.findByLabelText("Email для приглашения");
+    await userEvent.type(emailInput, "new@test.ru");
+    await userEvent.click(screen.getByText("Пригласить"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Передайте ссылку вручную/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("https://smetaapp.ru/invite/abc123")).toBeInTheDocument();
+  });
+
+  it("показывает «письмо отправлено» если email_sent=true", async () => {
+    stubSuperuser();
+    const org = { id: 1, name: "Акме", user_count: 0 };
+    const inviteResult = {
+      id: 11,
+      email: "another@test.ru",
+      role: "viewer",
+      status: "invited",
+      email_sent: true,
+      invite_link: "https://smetaapp.ru/invite/xyz789",
+    };
+    vi.spyOn(orgsApi, "inviteUser").mockResolvedValue(inviteResult);
+    vi.spyOn(orgsApi, "listOrgs").mockResolvedValue([org]);
+    vi.spyOn(orgsApi, "listOrgUsers").mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <OrgsPage />
+      </MemoryRouter>
+    );
+
+    await screen.findByText("Акме");
+    await userEvent.click(screen.getByText("Акме"));
+
+    const emailInput = await screen.findByLabelText("Email для приглашения");
+    await userEvent.type(emailInput, "another@test.ru");
+    await userEvent.click(screen.getByText("Пригласить"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Письмо с приглашением отправлено/)).toBeInTheDocument();
+    });
+  });
+
+  it("кнопка «Переотправить» доступна для пользователей со статусом invited", async () => {
+    stubSuperuser();
+    const org = { id: 1, name: "Акме", user_count: 1 };
+    const invitedUser = { id: 5, email: "inv@test.ru", name: "", role: "estimator", status: "invited" };
+    const resendResult = {
+      id: 5,
+      email: "inv@test.ru",
+      role: "estimator",
+      status: "invited",
+      email_sent: false,
+      invite_link: "https://smetaapp.ru/invite/resend-token",
+    };
+    vi.spyOn(orgsApi, "listOrgs").mockResolvedValue([org]);
+    vi.spyOn(orgsApi, "listOrgUsers").mockResolvedValue([invitedUser]);
+    vi.spyOn(orgsApi, "resendInvite").mockResolvedValue(resendResult);
+
+    render(
+      <MemoryRouter>
+        <OrgsPage />
+      </MemoryRouter>
+    );
+
+    await screen.findByText("Акме");
+    await userEvent.click(screen.getByText("Акме"));
+
+    const resendBtn = await screen.findByText("Переотправить");
+    expect(resendBtn).toBeInTheDocument();
+    await userEvent.click(resendBtn);
+
+    await waitFor(() => {
+      expect(orgsApi.resendInvite).toHaveBeenCalledWith(1, 5);
     });
   });
 });
