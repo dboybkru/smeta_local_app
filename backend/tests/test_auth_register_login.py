@@ -27,16 +27,16 @@ def test_duplicate_email_rejected(client):
     assert resp.status_code == 409
 
 
-def test_login_returns_token_pair(client):
+def test_login_returns_user_out(client):
     register(client)
     resp = client.post(
         "/api/auth/login", json={"email": "user@test.ru", "password": "secret123"}
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["access_token"]
-    assert body["refresh_token"]
-    assert body["token_type"] == "bearer"
+    assert body["email"] == "user@test.ru"
+    assert "role" in body
+    assert "status" in body
 
 
 def test_login_wrong_password_401(client):

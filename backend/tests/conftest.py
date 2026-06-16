@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 # Воркер-поток не запускаем в тестах (он бы лез в реальную БД через SessionLocal).
 # Должно стоять до создания TestClient (триггерит lifespan→start_worker).
 os.environ.setdefault("JOBS_WORKER_DISABLED", "1")
+# Starlette TestClient ходит по http → Secure-cookie не вернётся без этой строки.
+os.environ.setdefault("COOKIE_SECURE", "false")
 
 from app.orgs import models as _orgs_models  # noqa: E402, F401
 from app.auth import models as _models  # noqa: E402, F401 — регистрирует таблицы в metadata

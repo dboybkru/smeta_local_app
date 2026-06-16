@@ -20,7 +20,14 @@ def make_user(client, email):
     assert resp.status_code == 201
     resp = client.post("/api/auth/login", json={"email": email, "password": "secret123"})
     assert resp.status_code == 200
-    return resp.json()
+    user_data = resp.json()
+    # Очищаем cookie-jar чтобы Bearer-заголовки не перекрывались cookie следующего login
+    client.cookies.clear()
+    return {
+        "access_token": create_access_token(user_data["id"], user_data["role"]),
+        "id": user_data["id"],
+        "role": user_data["role"],
+    }
 
 
 def auth(tokens):
