@@ -27,9 +27,3 @@ class UserOut(BaseModel):
     is_superuser: bool = False
     org_id: int | None = None
     org_name: str | None = None
-
-
-class TokenPair(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
