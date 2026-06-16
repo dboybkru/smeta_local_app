@@ -23,3 +23,13 @@ def test_profile_is_per_org(client, db_session):
 def test_ai_config_requires_superuser(client, db_session):
     oa, ua = _org_admin(db_session, "AIA")  # org_admin, NOT superuser
     assert client.get("/api/ai/providers", headers=_hdr(ua)).status_code == 403
+
+
+def test_estimator_can_get_profile(client, db_session):
+    o, _ = _org_admin(db_session, "EST")
+    estimator = User(
+        email="est@x.ru", name="E", role="estimator", status="active", org_id=o.id
+    )
+    db_session.add(estimator)
+    db_session.commit()
+    assert client.get("/api/profile", headers=_hdr(estimator)).status_code == 200

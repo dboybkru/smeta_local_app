@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_superuser as require_admin
-from app.auth.models import User
+from app.auth.deps import require_superuser
 from app.core.db import get_db
 from app.settings import service
 
@@ -40,13 +39,17 @@ def _yandex_status(db: Session) -> dict:
     }
 
 
-@router.get("/dadata", dependencies=[Depends(require_admin)])
+@router.get("/dadata", dependencies=[Depends(require_superuser)])
 def get_dadata(db: Session = Depends(get_db)):
     return _status(db)
 
 
-@router.put("/dadata", dependencies=[Depends(require_admin)])
-def set_dadata(body: DadataIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+@router.put("/dadata")
+def set_dadata(
+    body: DadataIn,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_superuser),
+):
     if body.token.strip():
         service.set_secret(db, DADATA_KEY, body.token.strip())
     if body.secret.strip():
@@ -54,16 +57,16 @@ def set_dadata(body: DadataIn, db: Session = Depends(get_db), user: User = Depen
     return _status(db)
 
 
-@router.get("/yandex", dependencies=[Depends(require_admin)])
+@router.get("/yandex", dependencies=[Depends(require_superuser)])
 def get_yandex(db: Session = Depends(get_db)):
     return _yandex_status(db)
 
 
-@router.put("/yandex", dependencies=[Depends(require_admin)])
+@router.put("/yandex")
 def set_yandex(
     body: YandexOAuthIn,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin),
+    _: object = Depends(require_superuser),
 ):
     if body.client_id.strip():
         service.set_secret(db, YANDEX_CLIENT_ID, body.client_id.strip())
