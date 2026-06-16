@@ -230,6 +230,23 @@ async def import_file(
     if not items:
         raise HTTPException(status_code=422, detail="Не выбран ни один лист")
 
+    # Проверяем, что все price_level_id из маппинга принадлежат текущей организации
+    referenced_level_ids: set[int] = set()
+    for sm in items:
+        referenced_level_ids.update(sm.mapping.price_cols.keys())
+    if referenced_level_ids:
+        own_level_ids = set(
+            db.scalars(
+                select(PriceLevel.id).where(PriceLevel.org_id == org)
+            ).all()
+        )
+        alien_ids = referenced_level_ids - own_level_ids
+        if alien_ids:
+            raise HTTPException(
+                status_code=422,
+                detail="Уровень цены не принадлежит вашей организации",
+            )
+
     tables = _load_tables_or_415(await _read_limited(file), file.filename or "")
     parsed: list[importer.ParsedRow] = []
     for sm in items:
